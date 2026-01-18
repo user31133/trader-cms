@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+
+{% block title %}Profile - Trader CMS{% endblock %}
+{% block page_title %}Profile{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h4>Account Settings</h4>
+        </div>
+        <div class="col-md-4 text-end">
+            <button class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#edit-profile-modal">
+                <i class="bi bi-pencil"></i> Edit Profile
+            </button>
+        </div>
+    </div>
+
+    <!-- Profile Card -->
+    <div class="card border-0 shadow-sm">
+        <div class="card-body">
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <h6 class="text-muted">Business Name</h6>
+                    <p class="h5">{{ trader.business_name }}</p>
+                </div>
+                <div class="col-md-6">
+                    <h6 class="text-muted">Account Status</h6>
+                    <p>
+                        <span class="badge bg-{% if trader.status == 'ACTIVE' %}success{% elif trader.status == 'PENDING' %}warning{% else %}danger{% endif %}">
+                            {{ trader.status }}
+                        </span>
+                    </p>
+                </div>
+            </div>
+
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <h6 class="text-muted">Email Address</h6>
+                    <p>{{ trader.email }}</p>
+                </div>
+                <div class="col-md-6">
+                    <h6 class="text-muted">Member Since</h6>
+                    <p>{{ trader.created_at.strftime('%B %d, %Y') }}</p>
+                </div>
+            </div>
+
+            {% if trader.api_key %}
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <h6 class="text-muted">API Key</h6>
+                    <div class="input-group">
+                        <input type="password" class="form-control" id="api-key" value="{{ trader.api_key }}" readonly>
+                        <button class="btn btn-outline-secondary" type="button" id="toggle-api-key">
+                            <i class="bi bi-eye"></i>
+                        </button>
+                    </div>
+                    <small class="text-muted">Use this key to sync products and orders from Admin API.</small>
+                </div>
+            </div>
+            {% else %}
+            <div class="alert alert-info">
+                <i class="bi bi-info-circle"></i> Your account is pending approval. API key will be available once your account is activated by the admin.
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+</div>
+
+<!-- Edit Profile Modal -->
+<div class="modal fade" id="edit-profile-modal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Edit Profile</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form hx-patch="/api/v1/trader/profile"
+                  hx-swap="closeModal swap:1s"
+                  hx-on::response-error="alert('Error updating profile')">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="business_name" class="form-label">Business Name</label>
+                        <input type="text" class="form-control" id="business_name" name="business_name"
+                               value="{{ trader.business_name }}" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-circle"></i> Save Changes
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.getElementById('toggle-api-key').addEventListener('click', function() {
+        const input = document.getElementById('api-key');
+        const btn = this;
+
+        if (input.type === 'password') {
+            input.type = 'text';
+            btn.innerHTML = '<i class="bi bi-eye-slash"></i>';
+        } else {
+            input.type = 'password';
+            btn.innerHTML = '<i class="bi bi-eye"></i>';
+        }
+    });
+</script>
+{% endblock %}

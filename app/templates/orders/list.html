@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+
+{% block title %}Orders - Trader CMS{% endblock %}
+{% block page_title %}Orders{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <h4>Your Orders</h4>
+        </div>
+        <div class="col-md-6 text-end">
+            <button class="btn btn-outline-secondary" hx-post="/sync/orders" hx-indicator="#loading">
+                <i class="bi bi-arrow-clockwise"></i> Sync Orders
+            </button>
+        </div>
+    </div>
+
+    <!-- Loading Indicator -->
+    <div id="loading" class="htmx-indicator alert alert-info mb-3" style="display:none;">
+        <i class="bi bi-hourglass-split"></i> Syncing orders...
+    </div>
+
+    <!-- Orders Table -->
+    <div class="card border-0 shadow-sm">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Order ID</th>
+                        <th>Customer Email</th>
+                        <th>Total Amount</th>
+                        <th>Status</th>
+                        <th>Items</th>
+                        <th>Order Date</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if orders %}
+                        {% for order in orders %}
+                        <tr>
+                            <td><strong>#{{ order.source_id }}</strong></td>
+                            <td>{{ order.customer_email | default('Guest') }}</td>
+                            <td>${{ order.total }}</td>
+                            <td>
+                                <span class="badge bg-{% if order.status == 'DELIVERED' %}success{% elif order.status == 'IN_TRANSIT' %}primary{% elif order.status == 'PICKED_UP' %}info{% elif order.status == 'PENDING' or order.status == 'CONFIRMED' %}warning{% else %}danger{% endif %}">
+                                    {{ order.status }}
+                                </span>
+                            </td>
+                            <td>
+                                <button class="btn btn-sm btn-outline-primary"
+                                        hx-get="/orders/{{ order.id }}/details"
+                                        hx-target="#order-modal-content"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#orderModal">
+                                    <i class="bi bi-eye"></i> View Details
+                                </button>
+                            </td>
+                            <td>{{ order.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                    <tr>
+                        <td colspan="6" class="text-center py-4 text-muted">
+                            No orders found. <a href="#" hx-post="/sync/orders">Sync orders</a> from Admin API.
+                        </td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Pagination -->
+    {% include "includes/pagination.html" %}
+</div>
+
+<!-- Order Details Modal -->
+<div class="modal fade" id="orderModal" tabindex="-1" aria-labelledby="orderModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content border-0">
+            <div id="order-modal-content">
+                <!-- Order details will be loaded here via HTMX -->
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verify OTP - Trader CMS</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .otp-card {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            padding: 40px;
+            max-width: 450px;
+            width: 100%;
+        }
+        .otp-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .otp-header h2 {
+            color: #667eea;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+        .otp-header .bi {
+            font-size: 48px;
+            color: #667eea;
+            margin-bottom: 15px;
+        }
+        .otp-info {
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            margin-bottom: 25px;
+            border-radius: 4px;
+        }
+        .otp-info p {
+            margin: 0;
+            font-size: 14px;
+            color: #495057;
+        }
+        .otp-info strong {
+            color: #667eea;
+        }
+        .otp-input {
+            font-size: 24px;
+            text-align: center;
+            letter-spacing: 10px;
+            font-weight: 600;
+            padding: 15px;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            transition: all 0.3s;
+        }
+        .otp-input:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+        }
+        .timer {
+            text-align: center;
+            margin-top: 15px;
+            font-size: 14px;
+            color: #6c757d;
+        }
+        .timer.warning {
+            color: #dc3545;
+            font-weight: 600;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            padding: 12px;
+            font-weight: 600;
+            border-radius: 8px;
+            transition: transform 0.2s;
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        .back-link {
+            text-align: center;
+            margin-top: 20px;
+        }
+        .back-link a {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        .back-link a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="otp-card">
+        <div class="otp-header">
+            <i class="bi bi-shield-lock"></i>
+            <h2>Verify Your Identity</h2>
+            <p class="text-muted">Enter the OTP code sent to your email</p>
+        </div>
+
+        {% if error %}
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            {{ error }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+        {% endif %}
+
+        <div class="otp-info">
+            <p><i class="bi bi-envelope me-2"></i>OTP sent to <strong>{{ email }}</strong></p>
+            <p><i class="bi bi-clock me-2"></i>Code expires in <strong id="timer">{{ expires_in }}</strong> seconds</p>
+        </div>
+
+        <form action="/api/verify-otp" method="POST">
+            <div class="mb-3">
+                <label for="otp" class="form-label">OTP Code</label>
+                <input type="text"
+                       class="form-control otp-input"
+                       id="otp"
+                       name="otp"
+                       placeholder="000000"
+                       required
+                       maxlength="6"
+                       pattern="[0-9]{6}"
+                       autofocus>
+                <div class="form-text">Enter the 6-digit code from your email</div>
+            </div>
+
+            <button type="submit" class="btn btn-primary w-100 mb-3">
+                <i class="bi bi-check-circle me-2"></i>Verify OTP
+            </button>
+        </form>
+
+        <div class="back-link">
+            <a href="/login"><i class="bi bi-arrow-left me-1"></i>Back to Login</a>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Timer countdown
+        let timeLeft = {{ expires_in }};
+        const timerElement = document.getElementById('timer');
+
+        const countdown = setInterval(() => {
+            timeLeft--;
+            timerElement.textContent = timeLeft;
+
+            if (timeLeft <= 30) {
+                timerElement.parentElement.classList.add('warning');
+            }
+
+            if (timeLeft <= 0) {
+                clearInterval(countdown);
+                timerElement.parentElement.innerHTML = '<i class="bi bi-exclamation-triangle me-2"></i>OTP expired. Please <a href="/login">login again</a>';
+            }
+        }, 1000);
+
+        // Auto-format OTP input (numbers only)
+        const otpInput = document.getElementById('otp');
+        otpInput.addEventListener('input', (e) => {
+            e.target.value = e.target.value.replace(/[^0-9]/g, '');
+        });
+
+        // Auto-submit when 6 digits entered
+        otpInput.addEventListener('input', (e) => {
+            if (e.target.value.length === 6) {
+                // Small delay for UX
+                setTimeout(() => {
+                    e.target.form.submit();
+                }, 300);
+            }
+        });
+    </script>
+</body>
+</html>

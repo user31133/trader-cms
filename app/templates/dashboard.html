@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Trader CMS{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Stats Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <small class="text-muted d-block mb-2">Total Orders</small>
+                            <h3 class="mb-0">{{ stats.total_orders | default(0) }}</h3>
+                        </div>
+                        <div class="bg-primary bg-opacity-10 p-3 rounded">
+                            <i class="bi bi-bag text-primary fs-5"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <small class="text-muted d-block mb-2">Total Revenue</small>
+                            <h3 class="mb-0">${{ stats.total_revenue | default(0) }}</h3>
+                        </div>
+                        <div class="bg-success bg-opacity-10 p-3 rounded">
+                            <i class="bi bi-currency-dollar text-success fs-5"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <small class="text-muted d-block mb-2">Pending Orders</small>
+                            <h3 class="mb-0">{{ stats.pending_orders | default(0) }}</h3>
+                        </div>
+                        <div class="bg-warning bg-opacity-10 p-3 rounded">
+                            <i class="bi bi-clock text-warning fs-5"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <small class="text-muted d-block mb-2">Total Products</small>
+                            <h3 class="mb-0">{{ product_count | default(0) }}</h3>
+                        </div>
+                        <div class="bg-info bg-opacity-10 p-3 rounded">
+                            <i class="bi bi-box text-info fs-5"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title mb-3">Quick Actions</h5>
+                    <div class="d-flex flex-wrap gap-2">
+                        <button class="btn btn-primary" hx-post="/sync/products" hx-target="#sync-status">
+                            <i class="bi bi-arrow-clockwise"></i> Sync Products
+                        </button>
+                        <a href="/products" class="btn btn-outline-primary">
+                            <i class="bi bi-box"></i> Manage Products
+                        </a>
+                        <a href="/orders" class="btn btn-outline-primary">
+                            <i class="bi bi-bag"></i> View Orders
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sync Status -->
+    <div id="sync-status" class="mb-4"></div>
+
+    <!-- Recent Orders -->
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white border-bottom">
+                    <h5 class="card-title mb-0">Recent Orders</h5>
+                </div>
+                <div class="card-body">
+                    {% if recent_orders %}
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Order ID</th>
+                                    <th>Customer</th>
+                                    <th>Amount</th>
+                                    <th>Status</th>
+                                    <th>Date</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for order in recent_orders[:5] %}
+                                <tr>
+                                    <td><strong>#{{ order.source_id }}</strong></td>
+                                    <td>{{ order.customer_email | default('N/A') }}</td>
+                                    <td>${{ order.total }}</td>
+                                    <td>
+                                        <span class="badge bg-{% if order.status == 'DELIVERED' %}success{% elif order.status == 'PENDING' %}warning{% else %}info{% endif %}">
+                                            {{ order.status }}
+                                        </span>
+                                    </td>
+                                    <td>{{ order.created_at.strftime('%Y-%m-%d') }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <p class="text-muted text-center py-4">No orders yet. <a href="#" hx-post="/sync/orders">Sync orders</a> from Admin API.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    htmx.on('#sync-status', 'htmx:oobSwap', function(evt) {
+        const status = evt.detail.xhr.responseText;
+        if (status.includes('complete')) {
+            setTimeout(() => location.reload(), 2000);
+        }
+    });
+</script>
+{% endblock %}
