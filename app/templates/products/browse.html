@@ -3,101 +3,98 @@
 {% block title %}Browse Products - {{ trader.business_name }}{% endblock %}
 
 {% block content %}
-<div class="container-fluid mt-4">
+<div class="container-fluid mt-4 pb-5">
     <!-- Header -->
-    <div class="row mb-4">
+    <div class="row mb-4 align-items-center">
         <div class="col-md-6">
-            <h2><i class="bi bi-search"></i> Browse & Add Products</h2>
-            <p class="text-muted">Select products to add to your catalog</p>
+            <h2 class="fw-bold mb-1"><i class="bi bi-search text-primary"></i> Browse & Add Products</h2>
+            <p class="text-muted">Explore the central catalog and select products for your shop</p>
         </div>
         <div class="col-md-6 text-end">
-            <a href="/products" class="btn btn-outline-secondary me-2">
+            <a href="/products" class="btn btn-light border me-2 py-2 px-3">
                 <i class="bi bi-arrow-left"></i> Back to Products
             </a>
-            <button class="btn btn-primary" id="view-cart-btn">
-                <i class="bi bi-cart"></i> View Cart
-                <span class="badge bg-light text-dark" id="cart-count">{{ cart_count }}</span>
+            <button class="btn btn-dark py-2 px-4 shadow-sm" id="view-cart-btn">
+                <i class="bi bi-cart3 me-1"></i> View Cart
+                <span class="badge bg-primary ms-2" id="cart-count">{{ cart_count }}</span>
             </button>
         </div>
-    </div>
-
-    <!-- Backend Not Ready Warning Banner -->
-    <div class="alert alert-warning alert-dismissible fade show" role="alert" id="backend-warning">
-        <i class="bi bi-exclamation-triangle"></i>
-        <strong>Backend endpoints not ready yet!</strong>
-        The browse products feature is under development. You can still use the "Sync All Products" button on the products page.
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
     </div>
 
     <!-- Filters Row -->
-    <div class="row mb-4">
-        <div class="col-md-4">
-            <label for="category-filter" class="form-label">Filter by Category</label>
-            <select class="form-select" id="category-filter">
-                <option value="">All Categories</option>
-            </select>
-        </div>
-        <div class="col-md-6">
-            <label for="search-input" class="form-label">Search Products</label>
-            <input type="text" class="form-control" id="search-input" placeholder="Search by product name...">
-        </div>
-        <div class="col-md-2 d-flex align-items-end">
-            <button class="btn btn-primary w-100" id="search-btn">
-                <i class="bi bi-search"></i> Search
-            </button>
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body p-4">
+            <div class="row g-3">
+                <div class="col-12">
+                    <label for="category-filter" class="form-label small fw-bold text-uppercase text-muted">Category</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-light border-end-0"><i class="bi bi-filter"></i></span>
+                        <select class="form-select bg-light border-start-0 ps-0" id="category-filter">
+                            <option value="">All Categories</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
     <!-- Products Grid -->
-    <div class="row" id="products-grid">
+    <div class="row g-4" id="products-grid">
+        <!-- Spinner shows by default -->
         <div class="col-12 text-center py-5">
-            <div class="spinner-border text-primary" role="status">
+            <div class="spinner-grow text-primary" role="status">
                 <span class="visually-hidden">Loading...</span>
             </div>
-            <p class="text-muted mt-3">Loading products...</p>
+            <p class="text-muted mt-3 fw-medium">Loading catalog...</p>
         </div>
     </div>
 
     <!-- Pagination -->
-    <div class="row mt-4">
-        <div class="col-12">
-            <nav aria-label="Product pagination">
-                <ul class="pagination justify-content-center" id="pagination">
+    <div class="row mt-5">
+        <div class="col-12 d-flex justify-content-center">
+            <nav aria-label="Product pagination" id="pagination-nav" style="display: none;">
+                <ul class="pagination pagination-md shadow-sm" id="pagination">
                 </ul>
             </nav>
         </div>
     </div>
 
     <!-- Floating Save Button -->
-    <div class="position-fixed bottom-0 end-0 p-4" style="z-index: 1000;">
-        <button class="btn btn-success btn-lg shadow" id="save-selection-btn" style="display: none;">
-            <i class="bi bi-check-circle"></i> Save Selected Products
+    <div class="position-fixed bottom-0 end-0 p-4" style="z-index: 1050;">
+        <button class="btn btn-success btn-lg shadow-lg px-4 py-3 rounded-pill transition-all scale-hover" id="save-selection-btn" style="display: none; border: 2px solid rgba(255,255,255,0.2); backdrop-filter: blur(4px);">
+            <div class="d-flex align-items-center">
+                <i class="bi bi-check2-circle fs-4 me-2"></i>
+                <div class="text-start">
+                    <div class="fw-bold lh-1">Save Selection</div>
+                    <small class="opacity-75" id="save-btn-count">0 items ready</small>
+                </div>
+            </div>
         </button>
     </div>
 </div>
 
 <!-- Cart Modal -->
 <div class="modal fade" id="cartModal" tabindex="-1" aria-labelledby="cartModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-scrollable">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="cartModalLabel">
-                    <i class="bi bi-cart"></i> Selection Cart
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-dark text-white border-0 py-3">
+                <h5 class="modal-title d-flex align-items-center" id="cartModalLabel">
+                    <i class="bi bi-cart-check me-2"></i> Selection Cart
                 </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body" id="cart-modal-body">
-                <div class="text-center py-4">
-                    <p class="text-muted">Your cart is empty</p>
+            <div class="modal-body p-0" id="cart-modal-body">
+                <div class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status"></div>
                 </div>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-outline-danger" id="clear-cart-btn">
-                    <i class="bi bi-trash"></i> Clear Cart
+            <div class="modal-footer border-0 p-3 bg-light">
+                <button type="button" class="btn btn-link text-danger text-decoration-none fw-bold me-auto" id="clear-cart-btn">
+                    <i class="bi bi-trash3 me-1"></i> Clear Selection
                 </button>
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                <button type="button" class="btn btn-success" id="save-from-modal-btn">
-                    <i class="bi bi-check-circle"></i> Save Selection
+                <button type="button" class="btn btn-outline-secondary px-4 py-2" data-bs-dismiss="modal">Continue Browsing</button>
+                <button type="button" class="btn btn-success px-4 py-2 fw-bold" id="save-from-modal-btn">
+                    Save to My Catalog
                 </button>
             </div>
         </div>
@@ -105,120 +102,188 @@
 </div>
 
 <style>
+/* Modern Premium UI Styles */
+:root {
+    --primary-color: #0d6efd;
+    --success-color: #198754;
+}
+
+.transition-all {
+    transition: all 0.25s ease-in-out;
+}
+
+.scale-hover:hover {
+    transform: scale(1.05);
+}
+
+.shadow-sm-hover:hover {
+    box-shadow: 0 .5rem 1rem rgba(0,0,0,.15)!important;
+}
+
 .product-card {
-    transition: transform 0.2s, box-shadow 0.2s;
-    height: 100%;
+    border: 1px solid rgba(0,0,0,0.08);
+    border-radius: 16px;
+    overflow: hidden;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    background: #fff;
 }
 
 .product-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    transform: translateY(-8px);
+    box-shadow: 0 12px 24px rgba(0,0,0,0.1);
 }
 
 .product-card.selected {
-    border: 2px solid #198754;
-    background-color: #f0f9f4;
-}
-
-.product-card .card-img-top {
-    height: 200px;
-    object-fit: cover;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: white;
-    font-size: 3rem;
-}
-
-.stock-badge {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    z-index: 10;
+    border: 2.5px solid var(--success-color);
+    background-color: #f8fffb;
 }
 
 .price-tag {
-    font-size: 1.5rem;
-    font-weight: bold;
-    color: #198754;
+    font-size: 1.25rem;
+    font-weight: 800;
+    color: #212529;
+}
+
+.add-to-cart-btn {
+    border-radius: 10px;
+    padding: 8px 16px;
+    font-weight: 600;
+}
+
+.pagination .page-link {
+    border: none;
+    color: #495057;
+    margin: 0 3px;
+    border-radius: 8px;
+    font-weight: 500;
+}
+
+.pagination .page-item.active .page-link {
+    background-color: var(--primary-color);
+    color: white;
+}
+
+.cart-item {
+    border-bottom: 1px solid rgba(0,0,0,0.05);
+    transition: background 0.2s;
+}
+
+.cart-item:last-child {
+    border-bottom: none;
+}
+
+.cart-item:hover {
+    background: #f8f9fa;
 }
 </style>
 
 <script>
+// State Management
 let currentPage = 1;
 let selectedCategory = null;
-let searchQuery = null;
-let cart = {{ cart_count }};
+let cartCount = {{ cart_count }};
+let cartItems = [];
 let cartModal = null;
 let browseCache = [];
+let existingProducts = {{ existing_products | tojson }};
 
 document.addEventListener('DOMContentLoaded', function() {
     cartModal = new bootstrap.Modal(document.getElementById('cartModal'));
+
+    // Initialize UI from session data
+    updateCartDisplay(cartCount);
 
     // Load initial data
     loadCategories();
     loadProducts();
 
-    // Event listeners
+    // Event Listeners
     document.getElementById('category-filter').addEventListener('change', function(e) {
         selectedCategory = e.target.value || null;
         currentPage = 1;
         loadProducts();
     });
 
-    document.getElementById('search-btn').addEventListener('click', function() {
-        searchQuery = document.getElementById('search-input').value || null;
-        currentPage = 1;
-        loadProducts();
-    });
 
-    document.getElementById('search-input').addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') {
-            searchQuery = this.value || null;
-            currentPage = 1;
-            loadProducts();
-        }
-    });
+    document.getElementById('view-cart-btn').addEventListener('click', () => showCart());
+    document.getElementById('save-selection-btn').addEventListener('click', () => saveSelection());
+    document.getElementById('save-from-modal-btn').addEventListener('click', () => saveSelection());
+    document.getElementById('clear-cart-btn').addEventListener('click', () => clearCart());
 
-    document.getElementById('view-cart-btn').addEventListener('click', function() {
-        showCart();
-    });
-
-    document.getElementById('save-selection-btn').addEventListener('click', function() {
-        saveSelection();
-    });
-
-    document.getElementById('save-from-modal-btn').addEventListener('click', function() {
-        saveSelection();
-    });
-
-    document.getElementById('clear-cart-btn').addEventListener('click', function() {
-        clearCart();
-    });
+    // Sync cart initially
+    syncCartState();
 });
 
 async function loadCategories() {
     try {
+        // Try to fetch categories directly from the API
         const response = await fetch('/api/v1/browse/categories');
-        if (response.status === 501) {
-            console.log('Backend categories endpoint not ready');
-            return;
-        }
 
         if (response.ok) {
             const categories = await response.json();
-            const select = document.getElementById('category-filter');
 
+            // Sort categories alphabetically and populate dropdown
+            categories.sort((a, b) => a.name.localeCompare(b.name));
+
+            const select = document.getElementById('category-filter');
             categories.forEach(cat => {
                 const option = document.createElement('option');
                 option.value = cat.sourceId;
                 option.textContent = cat.name;
                 select.appendChild(option);
             });
+        } else {
+            console.warn('Categories endpoint failed, falling back to extracting from products');
+            // Fallback: Extract categories from products
+            await loadCategoriesFromProducts();
         }
     } catch (error) {
         console.error('Error loading categories:', error);
+        // Fallback: Extract categories from products
+        await loadCategoriesFromProducts();
+    }
+}
+
+async function loadCategoriesFromProducts() {
+    try {
+        // Fetch all products across multiple pages to extract unique categories
+        const allProducts = [];
+        let page = 1;
+        let hasMore = true;
+
+        while (hasMore && page <= 10) {
+            const response = await fetch(`/api/v1/browse/products?page=${page}&limit=100`);
+            if (response.ok) {
+                const data = await response.json();
+                allProducts.push(...data.products);
+                hasMore = data.page < data.totalPages;
+                page++;
+            } else {
+                break;
+            }
+        }
+
+        // Extract unique categories by name (not by ID to handle duplicates)
+        const categoryMap = new Map();
+        allProducts.forEach(product => {
+            if (product.category && !categoryMap.has(product.category.name)) {
+                categoryMap.set(product.category.name, product.category.sourceId);
+            }
+        });
+
+        // Sort categories alphabetically and populate dropdown
+        const categories = Array.from(categoryMap, ([name, sourceId]) => ({ sourceId, name }))
+            .sort((a, b) => a.name.localeCompare(b.name));
+
+        const select = document.getElementById('category-filter');
+        categories.forEach(cat => {
+            const option = document.createElement('option');
+            option.value = cat.sourceId;
+            option.textContent = cat.name;
+            select.appendChild(option);
+        });
+    } catch (error) {
+        console.error('Error loading categories from products:', error);
     }
 }
 
@@ -226,49 +291,30 @@ async function loadProducts() {
     const grid = document.getElementById('products-grid');
     grid.innerHTML = `
         <div class="col-12 text-center py-5">
-            <div class="spinner-border text-primary" role="status">
-                <span class="visually-hidden">Loading...</span>
-            </div>
-            <p class="text-muted mt-3">Loading products...</p>
+            <div class="spinner-grow text-primary" role="status"></div>
+            <p class="text-muted mt-3">Refreshing catalog...</p>
         </div>
     `;
 
     try {
         let url = `/api/v1/browse/products?page=${currentPage}&limit=12`;
         if (selectedCategory) url += `&category_id=${selectedCategory}`;
-        if (searchQuery) url += `&search=${encodeURIComponent(searchQuery)}`;
 
         const response = await fetch(url);
-
-        if (response.status === 501) {
-            grid.innerHTML = `
-                <div class="col-12 text-center py-5">
-                    <i class="bi bi-exclamation-circle text-warning" style="font-size: 4rem;"></i>
-                    <h4 class="mt-3">Backend Not Ready</h4>
-                    <p class="text-muted">The browse products endpoint is not implemented yet.</p>
-                    <a href="/products" class="btn btn-primary">
-                        <i class="bi bi-arrow-left"></i> Back to Products
-                    </a>
-                </div>
-            `;
-            return;
-        }
-
         if (response.ok) {
             const data = await response.json();
             browseCache = data.products;
             displayProducts(data.products);
-            updatePagination(data.page, data.totalPages);
+            updatePagination(data.page + 1, data.totalPages);
         } else {
-            throw new Error('Failed to load products');
+            throw new Error('Could not load products');
         }
     } catch (error) {
-        console.error('Error loading products:', error);
         grid.innerHTML = `
             <div class="col-12 text-center py-5">
-                <i class="bi bi-exclamation-triangle text-danger" style="font-size: 4rem;"></i>
-                <h4 class="mt-3">Error Loading Products</h4>
-                <p class="text-muted">${error.message}</p>
+                <i class="bi bi-exclamation-triangle text-danger fs-1"></i>
+                <h4 class="mt-3">Connection Error</h4>
+                <p class="text-muted">Unable to reach the backend catalog. <button class="btn btn-link p-0 align-baseline" onclick="loadProducts()">Retry</button></p>
             </div>
         `;
     }
@@ -280,257 +326,273 @@ function displayProducts(products) {
     if (products.length === 0) {
         grid.innerHTML = `
             <div class="col-12 text-center py-5">
-                <i class="bi bi-inbox text-muted" style="font-size: 4rem;"></i>
-                <h4 class="mt-3">No Products Found</h4>
-                <p class="text-muted">Try adjusting your filters or search query.</p>
+                <div class="opacity-25 pb-3">
+                    <i class="bi bi-search" style="font-size: 5rem;"></i>
+                </div>
+                <h5>No matching products found</h5>
+                <p class="text-muted">Try changing your filters or using a broader search term.</p>
             </div>
         `;
         return;
     }
 
-    grid.innerHTML = products.map(product => `
-        <div class="col-md-4 col-lg-3 mb-4">
-            <div class="card product-card" data-product-id="${product.sourceId}">
-                <div class="position-relative">
-                    <div class="card-img-top">
-                        <i class="bi bi-box-seam"></i>
-                    </div>
-                    <span class="badge ${product.centralStock > 0 ? 'bg-success' : 'bg-danger'} stock-badge">
-                        Stock: ${product.centralStock}
-                    </span>
-                </div>
-                <div class="card-body">
-                    <h6 class="card-title" title="${product.title}">${truncate(product.title, 50)}</h6>
-                    <p class="text-muted small mb-2">
-                        <i class="bi bi-tag"></i> ${product.category.name}
-                    </p>
-                    <div class="d-flex justify-content-between align-items-center">
-                        <span class="price-tag">$${parseFloat(product.price).toFixed(2)}</span>
-                        <button class="btn btn-sm btn-outline-success add-to-cart-btn"
-                                data-product-id="${product.sourceId}"
-                                onclick="toggleProductInCart(${product.sourceId})">
-                            <i class="bi bi-plus-circle"></i> Add
-                        </button>
+    grid.innerHTML = products.map(product => {
+        const isInCart = cartItems.includes(product.sourceId);
+        const isExisting = existingProducts.includes(product.sourceId);
+        const stockInfo = product.centralStock > 0
+            ? { class: 'bg-success-subtle text-success border-success', text: `In Stock: ${product.centralStock}` }
+            : { class: 'bg-danger-subtle text-danger border-danger', text: 'Out of Stock' };
+
+        let buttonHtml;
+        if (isExisting) {
+            buttonHtml = `
+                <button class="btn btn-sm btn-secondary add-to-cart-btn" disabled>
+                    <i class="bi bi-check-circle me-1"></i>
+                    Existing
+                </button>`;
+        } else {
+            buttonHtml = `
+                <button class="btn btn-sm ${isInCart ? 'btn-success' : 'btn-outline-primary'} add-to-cart-btn transition-all"
+                        onclick="toggleCartItem(${product.sourceId}, this)">
+                    <i class="bi ${isInCart ? 'bi-check2' : 'bi-plus-lg'} me-1"></i>
+                    ${isInCart ? 'Added' : 'Add'}
+                </button>`;
+        }
+
+        return `
+            <div class="col-sm-6 col-md-4 col-lg-3">
+                <div class="card product-card h-100 ${isInCart ? 'selected' : ''}" data-id="${product.sourceId}">
+                    <div class="card-body d-flex flex-column h-100 p-3">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <small class="text-uppercase fw-bold text-primary" style="font-size: 0.65rem; letter-spacing: 0.5px;">
+                                ${product.category.name}
+                            </small>
+                            <span class="badge ${stockInfo.class} px-2 py-1" style="font-size: 0.7rem;">${stockInfo.text}</span>
+                        </div>
+                        <h6 class="card-title fw-bold mb-3 flex-grow-1" style="line-height: 1.4; height: 2.8em; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">
+                            ${product.title}
+                        </h6>
+                        <div class="d-flex justify-content-between align-items-center mt-auto">
+                            <span class="price-tag">$${parseFloat(product.price).toFixed(2)}</span>
+                            ${buttonHtml}
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
-    `).join('');
-
-    // Highlight selected products
-    highlightSelectedProducts();
+        `;
+    }).join('');
 }
 
-function highlightSelectedProducts() {
-    fetch('/api/v1/browse/cart')
-        .then(res => res.json())
-        .then(data => {
-            const cartItems = data.cart;
-            document.querySelectorAll('.product-card').forEach(card => {
-                const productId = parseInt(card.dataset.productId);
-                const btn = card.querySelector('.add-to-cart-btn');
-
-                if (cartItems.includes(productId)) {
-                    card.classList.add('selected');
-                    btn.innerHTML = '<i class="bi bi-check-circle"></i> Added';
-                    btn.classList.remove('btn-outline-success');
-                    btn.classList.add('btn-success');
-                } else {
-                    card.classList.remove('selected');
-                    btn.innerHTML = '<i class="bi bi-plus-circle"></i> Add';
-                    btn.classList.remove('btn-success');
-                    btn.classList.add('btn-outline-success');
-                }
-            });
-        });
-}
-
-async function toggleProductInCart(productId) {
+async function syncCartState() {
     try {
-        const response = await fetch('/api/v1/browse/cart');
-        const data = await response.json();
-        const isInCart = data.cart.includes(productId);
+        const res = await fetch('/api/v1/browse/cart');
+        const data = await res.json();
+        cartItems = data.cart;
+        updateCartDisplay(data.count);
+        // Refresh grid items visibility
+        document.querySelectorAll('.product-card').forEach(card => {
+            const id = parseInt(card.dataset.id);
+            const btn = card.querySelector('.add-to-cart-btn');
+            if (cartItems.includes(id)) {
+                card.classList.add('selected');
+                btn.className = 'btn btn-sm btn-success add-to-cart-btn';
+                btn.innerHTML = '<i class="bi bi-check2 me-1"></i> Added';
+            } else {
+                card.classList.remove('selected');
+                btn.className = 'btn btn-sm btn-outline-primary add-to-cart-btn';
+                btn.innerHTML = '<i class="bi bi-plus-lg me-1"></i> Add';
+            }
+        });
+    } catch (e) {
+        console.error('Failed to sync cart:', e);
+    }
+}
 
-        const endpoint = isInCart ? '/api/v1/browse/cart/remove' : '/api/v1/browse/cart/add';
-        const result = await fetch(endpoint, {
+async function toggleCartItem(productId, btn) {
+    const isAdding = !cartItems.includes(productId);
+    const endpoint = isAdding ? '/api/v1/browse/cart/add' : '/api/v1/browse/cart/remove';
+    
+    // Optimistic UI
+    const card = btn.closest('.product-card');
+    if (isAdding) {
+        card.classList.add('selected');
+        btn.className = 'btn btn-sm btn-success add-to-cart-btn';
+        btn.innerHTML = '<i class="bi bi-check2 me-1"></i> Added';
+    } else {
+        card.classList.remove('selected');
+        btn.className = 'btn btn-sm btn-outline-primary add-to-cart-btn';
+        btn.innerHTML = '<i class="bi bi-plus-lg me-1"></i> Add';
+    }
+
+    try {
+        const res = await fetch(endpoint, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({productSourceIds: [productId]})
+            body: JSON.stringify({ productSourceIds: [productId] })
         });
-
-        if (result.ok) {
-            const cartData = await result.json();
-            updateCartCount(cartData.count);
-            highlightSelectedProducts();
-        }
+        const data = await res.json();
+        cartItems = data.cart;
+        updateCartDisplay(data.count);
     } catch (error) {
-        console.error('Error toggling cart:', error);
+        console.error('Cart operation failed:', error);
+        syncCartState(); // Revert on failure
     }
 }
 
-function updateCartCount(count) {
+function updateCartDisplay(count) {
+    cartCount = count;
     document.getElementById('cart-count').textContent = count;
-    cart = count;
+    document.getElementById('save-btn-count').textContent = `${count} product${count !== 1 ? 's' : ''} selected`;
 
-    // Show/hide save button
     const saveBtn = document.getElementById('save-selection-btn');
-    saveBtn.style.display = count > 0 ? 'block' : 'none';
-}
-
-function updatePagination(currentPageNum, totalPages) {
-    const pagination = document.getElementById('pagination');
-
-    if (totalPages <= 1) {
-        pagination.innerHTML = '';
-        return;
+    if (count > 0) {
+        saveBtn.style.display = 'block';
+        setTimeout(() => saveBtn.style.opacity = '1', 10);
+    } else {
+        saveBtn.style.display = 'none';
     }
 
-    let html = '';
-
-    // Previous button
-    html += `
-        <li class="page-item ${currentPageNum === 0 ? 'disabled' : ''}">
-            <a class="page-link" href="#" onclick="changePage(${currentPageNum}); return false;">Previous</a>
-        </li>
-    `;
-
-    // Page numbers
-    for (let i = 0; i < totalPages; i++) {
-        html += `
-            <li class="page-item ${currentPageNum === i ? 'active' : ''}">
-                <a class="page-link" href="#" onclick="changePage(${i + 1}); return false;">${i + 1}</a>
-            </li>
-        `;
+    // Update global cart badge in sidebar
+    if (typeof updateGlobalCartBadge === 'function') {
+        updateGlobalCartBadge();
     }
-
-    // Next button
-    html += `
-        <li class="page-item ${currentPageNum === totalPages - 1 ? 'disabled' : ''}">
-            <a class="page-link" href="#" onclick="changePage(${currentPageNum + 2}); return false;">Next</a>
-        </li>
-    `;
-
-    pagination.innerHTML = html;
-}
-
-function changePage(page) {
-    currentPage = page;
-    loadProducts();
-    window.scrollTo(0, 0);
 }
 
 async function showCart() {
+    const modalBody = document.getElementById('cart-modal-body');
+    modalBody.innerHTML = `
+        <div class="text-center py-5">
+            <div class="spinner-border text-primary" role="status"></div>
+        </div>
+    `;
+    cartModal.show();
+
     try {
-        const response = await fetch('/api/v1/browse/cart');
-        const data = await response.json();
-
-        const modalBody = document.getElementById('cart-modal-body');
-
+        const res = await fetch('/api/v1/browse/cart');
+        const data = await res.json();
+        
         if (data.count === 0) {
             modalBody.innerHTML = `
-                <div class="text-center py-4">
-                    <i class="bi bi-cart-x text-muted" style="font-size: 3rem;"></i>
-                    <p class="text-muted mt-3">Your cart is empty</p>
+                <div class="text-center py-5">
+                    <i class="bi bi-cart-x text-muted display-1 opacity-25"></i>
+                    <h5 class="mt-3">Your selection is empty</h5>
+                    <p class="text-muted">Go back to the catalog to find products.</p>
                 </div>
             `;
-        } else {
-            const selectedProducts = browseCache.filter(p => data.cart.includes(p.sourceId));
+            return;
+        }
 
-            modalBody.innerHTML = `
-                <div class="list-group">
-                    ${selectedProducts.map(product => `
-                        <div class="list-group-item">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <h6 class="mb-1">${product.title}</h6>
-                                    <small class="text-muted">${product.category.name} • $${parseFloat(product.price).toFixed(2)}</small>
-                                </div>
-                                <button class="btn btn-sm btn-outline-danger" onclick="removeFromCart(${product.sourceId})">
-                                    <i class="bi bi-trash"></i>
-                                </button>
+        // Get product details (using cache or fetching if needed)
+        // Since backend doesn't provide detail for cart items directly, we rely on the browseCache 
+        // or a potential detail endpoint. We'll use browseCache for now.
+        const items = browseCache.filter(p => data.cart.includes(p.sourceId));
+        
+        modalBody.innerHTML = `
+            <div class="list-group list-group-flush">
+                ${items.map(p => `
+                    <div class="list-group-item cart-item p-3 border-0">
+                        <div class="d-flex align-items-center">
+                            <div class="bg-light rounded p-2 me-3" style="width: 50px; height: 50px; display: flex; align-items: center; justify-content: center;">
+                                <i class="bi bi-box-seam text-secondary"></i>
                             </div>
+                            <div class="flex-grow-1">
+                                <h6 class="mb-0 fw-bold">${p.title}</h6>
+                                <small class="text-muted">${p.category.name} • $${parseFloat(p.price).toFixed(2)}</small>
+                            </div>
+                            <button class="btn btn-link text-danger p-2" onclick="toggleCartItem(${p.sourceId}, this); showCart();">
+                                <i class="bi bi-trash3"></i>
+                            </button>
                         </div>
-                    `).join('')}
+                    </div>
+                `).join('')}
+            </div>
+            ${items.length < data.count ? `
+                <div class="p-3 text-center border-top">
+                    <small class="text-muted">Showing ${items.length} of ${data.count} items in your selection.</small>
                 </div>
-                <div class="alert alert-info mt-3">
-                    <i class="bi bi-info-circle"></i>
-                    <strong>${data.count}</strong> product(s) selected
-                </div>
-            `;
-        }
-
-        cartModal.show();
-    } catch (error) {
-        console.error('Error loading cart:', error);
-    }
-}
-
-async function removeFromCart(productId) {
-    try {
-        const response = await fetch('/api/v1/browse/cart/remove', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({productSourceIds: [productId]})
-        });
-
-        if (response.ok) {
-            const data = await response.json();
-            updateCartCount(data.count);
-            showCart();
-            highlightSelectedProducts();
-        }
-    } catch (error) {
-        console.error('Error removing from cart:', error);
+            ` : ''}
+        `;
+    } catch (e) {
+        modalBody.innerHTML = '<div class="alert alert-danger m-3">Error loading cart details.</div>';
     }
 }
 
 async function clearCart() {
-    if (!confirm('Are you sure you want to clear your cart?')) return;
-
+    if (!confirm('Clear all selected products?')) return;
     try {
-        const response = await fetch('/api/v1/browse/cart/clear', {
-            method: 'POST'
-        });
-
-        if (response.ok) {
-            updateCartCount(0);
-            cartModal.hide();
-            highlightSelectedProducts();
-        }
-    } catch (error) {
-        console.error('Error clearing cart:', error);
-    }
+        await fetch('/api/v1/browse/cart/clear', { method: 'POST' });
+        syncCartState();
+        cartModal.hide();
+    } catch (e) { console.error('Clear failed'); }
 }
 
 async function saveSelection() {
-    if (cart === 0) {
-        alert('Your cart is empty. Add some products first.');
-        return;
-    }
-
-    if (!confirm(`Save ${cart} selected product(s) to your catalog?`)) return;
+    if (cartCount === 0) return;
+    
+    const btn = document.getElementById('save-selection-btn');
+    const originalHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<div class="spinner-border spinner-border-sm me-2"></div> Saving...';
 
     try {
-        const response = await fetch('/api/v1/browse/cart/save', {
-            method: 'POST'
-        });
-
+        const response = await fetch('/api/v1/browse/cart/save', { method: 'POST' });
         if (response.ok) {
             const result = await response.json();
-            alert(`Success! ${result.saved} product(s) saved to your catalog.\n\nCreated: ${result.created}\nUpdated: ${result.updated}`);
-            window.location.href = '/products';
+            window.location.href = '/products?success=' + encodeURIComponent(`Saved ${result.saved} products successfully!`);
         } else {
-            const error = await response.json();
-            alert(`Error: ${error.detail}`);
+            const err = await response.json();
+            alert('Error: ' + (err.detail || 'Failed to save'));
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
         }
     } catch (error) {
-        console.error('Error saving selection:', error);
-        alert('Error saving selection. Please try again.');
+        alert('Internal error saving selection');
+        btn.disabled = false;
+        btn.innerHTML = originalHtml;
     }
 }
 
-function truncate(str, maxLength) {
-    return str.length > maxLength ? str.substring(0, maxLength) + '...' : str;
+function updatePagination(curr, total) {
+    const nav = document.getElementById('pagination-nav');
+    const ul = document.getElementById('pagination');
+    
+    if (total <= 1) {
+        nav.style.display = 'none';
+        return;
+    }
+
+    nav.style.display = 'block';
+    let html = '';
+    
+    // Prev
+    html += `<li class="page-item ${curr === 1 ? 'disabled' : ''}">
+        <a class="page-link" href="#" onclick="changePage(${curr - 1})"><i class="bi bi-chevron-left"></i></a>
+    </li>`;
+
+    // Simple windowing logic
+    let start = Math.max(1, curr - 2);
+    let end = Math.min(total, start + 4);
+    if (end - start < 4) start = Math.max(1, end - 4);
+
+    for (let i = start; i <= end; i++) {
+        html += `<li class="page-item ${i === curr ? 'active' : ''}">
+            <a class="page-link" href="#" onclick="changePage(${i})">${i}</a>
+        </li>`;
+    }
+
+    // Next
+    html += `<li class="page-item ${curr === total ? 'disabled' : ''}">
+        <a class="page-link" href="#" onclick="changePage(${curr + 1})"><i class="bi bi-chevron-right"></i></a>
+    </li>`;
+
+    ul.innerHTML = html;
+}
+
+function changePage(page) {
+    if (event) event.preventDefault();
+    currentPage = page;
+    loadProducts();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 </script>
 {% endblock %}

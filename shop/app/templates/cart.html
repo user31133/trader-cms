@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+
+{% block title %}Your Bag{% endblock %}
+
+{% block content %}
+<div class="row mb-5">
+    <div class="col-12">
+        <h1 class="display-6 fw-extrabold mb-0">Shopping Bag</h1>
+        <p class="text-muted">Review your items before checkout.</p>
+    </div>
+</div>
+
+{% if cart.items %}
+<div class="row g-5">
+    <!-- Cart Items -->
+    <div class="col-lg-8">
+        <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
+            <div class="card-header bg-white py-3 border-bottom-0">
+                <h5 class="mb-0 fw-bold">Items</h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table align-middle mb-0">
+                        <thead class="bg-light text-muted small text-uppercase">
+                            <tr>
+                                <th class="ps-4 py-3">Product</th>
+                                <th class="py-3">Quantity</th>
+                                <th class="py-3">Price</th>
+                                <th class="pe-4 py-3 text-end">Subtotal</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in cart.items %}
+                            <tr class="border-bottom">
+                                <td class="ps-4 py-4">
+                                    <div class="d-flex align-items-center">
+                                        <div class="bg-light rounded-3 p-2 me-3" style="width: 70px; height: 70px;">
+                                            <i class="bi bi-image text-muted fs-3"></i>
+                                        </div>
+                                        <div>
+                                            <h6 class="mb-1 fw-bold">{{ item.product_title }}</h6>
+                                            <button class="btn btn-link text-danger p-0 small text-decoration-none" onclick="removeFromCart({{ item.product_id }})">
+                                                <i class="bi bi-trash3 me-1"></i>Remove
+                                            </button>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="py-4">
+                                    <div class="input-group input-group-sm" style="max-width: 120px;">
+                                        <button class="btn btn-outline-secondary border-0" onclick="updateCart({{ item.product_id }}, {{ item.quantity - 1 }})">-</button>
+                                        <input type="text" class="form-control text-center border-0 bg-light" value="{{ item.quantity }}" readonly>
+                                        <button class="btn btn-outline-secondary border-0" onclick="updateCart({{ item.product_id }}, {{ item.quantity + 1 }})">+</button>
+                                    </div>
+                                </td>
+                                <td class="py-4 text-muted">${{ "%.2f"|format(item.product_price) }}</td>
+                                <td class="pe-4 py-4 text-end fw-bold">${{ "%.2f"|format(item.subtotal) }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+        <div class="mt-4">
+            <a href="/products" class="btn btn-link text-decoration-none p-0 fw-semibold">
+                <i class="bi bi-arrow-left me-2"></i>Continue Shopping
+            </a>
+        </div>
+    </div>
+    
+    <!-- Order Summary Sidebar -->
+    <div class="col-lg-4">
+        <div class="card border-0 shadow-sm rounded-4 p-4 sticky-top" style="top: 100px;">
+            <h5 class="fw-bold mb-4">Bag Summary</h5>
+            <div class="d-flex justify-content-between mb-3 text-muted">
+                <span>Subtotal</span>
+                <span>${{ "%.2f"|format(cart.total) }}</span>
+            </div>
+            <div class="d-flex justify-content-between mb-3 text-muted">
+                <span>Shipping</span>
+                <span class="text-success">Free</span>
+            </div>
+            <hr class="my-4">
+            <div class="d-flex justify-content-between mb-4">
+                <span class="h5 fw-bold mb-0">Total</span>
+                <span class="h5 fw-extrabold mb-0 text-primary">${{ "%.2f"|format(cart.total) }}</span>
+            </div>
+            <a href="/checkout" class="btn btn-primary btn-lg w-100 py-3 fw-bold rounded-3 shadow-sm d-flex align-items-center justify-content-center gap-2">
+                <span>Secure Checkout</span>
+                <i class="bi bi-arrow-right fs-5"></i>
+            </a>
+        </div>
+    </div>
+</div>
+{% else %}
+<div class="text-center py-5">
+    <div class="mb-4">
+        <div class="bg-light rounded-circle d-inline-flex align-items-center justify-content-center" style="width: 120px; height: 120px;">
+            <i class="bi bi-bag-x text-muted" style="font-size: 4rem;"></i>
+        </div>
+    </div>
+    <h3 class="fw-bold">Your bag is empty</h3>
+    <p class="text-muted mb-4">Looks like you haven't added anything to your bag yet.</p>
+    <a href="/products" class="btn btn-primary px-5 py-3 fw-bold rounded-3 shadow-sm">Start Shopping</a>
+</div>
+{% endif %}
+{% endblock %}

@@ -15,7 +15,9 @@ from app.db.models import (
     TraderProduct,
     Order,
     OrderItem,
-    AuditLog
+    AuditLog,
+    CartItem,
+    ShopCustomer
 )
 
 

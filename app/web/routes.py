@@ -39,6 +39,9 @@ async def get_trader_from_session(request: Request, db: AsyncSession = Depends(g
 
 @router.get("/", response_class=HTMLResponse)
 async def root(request: Request):
+    # Check if user is logged in
+    if request.session.get("access_token"):
+        return RedirectResponse(url="/products")
     return RedirectResponse(url="/login")
 
 
@@ -97,7 +100,7 @@ async def login_route(
         request.session["backend_refresh_token"] = backend_response.get("refreshToken", "")
         request.session["user_id"] = cms_token_response.user_id
 
-        return RedirectResponse(url="/dashboard", status_code=302)
+        return RedirectResponse(url="/products", status_code=302)
     except ValueError as e:
         return templates.TemplateResponse(
             "auth/login.html",
@@ -160,7 +163,7 @@ async def verify_otp_route(
         request.session.pop("otp_expires_in", None)
 
         logger.info(f"OTP verification successful for {email}")
-        return RedirectResponse(url="/dashboard", status_code=302)
+        return RedirectResponse(url="/products", status_code=302)
 
     except Exception as e:
         logger.error(f"OTP verification error: {str(e)}")
@@ -246,13 +249,17 @@ async def dashboard(
 async def products_list(
     request: Request,
     page: int = 1,
+    category_id: int = None,
     trader: Trader = Depends(get_trader_from_session),
     db: AsyncSession = Depends(get_db)
 ):
+    from app.services.product import get_trader_categories
+
     if page < 1:
         page = 1
 
-    products, total_count = await get_trader_products(db, trader.id, page, 10)
+    products, total_count = await get_trader_products(db, trader.id, page, 10, category_id)
+    categories = await get_trader_categories(db, trader.id)
     total_pages = (total_count + 9) // 10
 
     return templates.TemplateResponse(
@@ -261,6 +268,8 @@ async def products_list(
             "request": request,
             "trader": trader,
             "products": products,
+            "categories": categories,
+            "selected_category": category_id,
             "page": page,
             "total_pages": total_pages,
             "total_count": total_count,
@@ -272,12 +281,46 @@ async def products_list(
 @router.get("/products/browse", response_class=HTMLResponse)
 async def browse_products_page(
     request: Request,
-    trader: Trader = Depends(get_trader_from_session)
+    trader: Trader = Depends(get_trader_from_session),
+    db: AsyncSession = Depends(get_db)
 ):
     """Product browsing and selection page"""
-    cart = request.session.get("selection_cart", [])
+    from app.services.selection import SelectionCartService
+    from app.db.models import Product, TraderProduct
+
+    cart = await SelectionCartService.get_cart(db, trader.id)
+
+    # Get existing product source IDs for this trader
+    result = await db.execute(
+        select(Product.source_id)
+        .select_from(TraderProduct)
+        .join(Product, TraderProduct.product_id == Product.id)
+        .where(TraderProduct.trader_id == trader.id)
+    )
+    existing_source_ids = [row[0] for row in result.all()]
+
     return templates.TemplateResponse(
         "products/browse.html",
+        {
+            "request": request,
+            "trader": trader,
+            "cart_count": len(cart),
+            "existing_products": existing_source_ids
+        }
+    )
+
+
+@router.get("/cart", response_class=HTMLResponse)
+async def cart_page(
+    request: Request,
+    trader: Trader = Depends(get_trader_from_session),
+    db: AsyncSession = Depends(get_db)
+):
+    """Shopping cart page"""
+    from app.services.selection import SelectionCartService
+    cart = await SelectionCartService.get_cart(db, trader.id)
+    return templates.TemplateResponse(
+        "products/cart.html",
         {
             "request": request,
             "trader": trader,
@@ -322,13 +365,10 @@ async def update_product_web(
     local_images_str = form_data.get("local_images", "")
     local_images = [img.strip() for img in local_images_str.split(",") if img.strip()] if local_images_str else None
 
-    visibility = form_data.get("visibility") == "on"
-
     update_data = ProductUpdate(
         local_description=form_data.get("local_description") or None,
         local_notes=form_data.get("local_notes") or None,
         local_images=local_images,
-        visibility=visibility,
         display_order=int(form_data.get("display_order", 0))
     )
 
@@ -345,6 +385,43 @@ async def update_product_web(
             content=f'<div class="alert alert-danger">{str(e)}</div>',
             status_code=400
         )
+
+
+@router.delete("/products/{product_id}")
+async def delete_product_web(
+    product_id: int,
+    trader: Trader = Depends(get_trader_from_session),
+    db: AsyncSession = Depends(get_db)
+):
+    from sqlalchemy import delete, and_
+    from app.db.models import TraderProduct, AuditLog
+    from datetime import datetime
+
+    # Delete the TraderProduct link (not the Product itself)
+    result = await db.execute(
+        delete(TraderProduct).where(
+            and_(
+                TraderProduct.trader_id == trader.id,
+                TraderProduct.product_id == product_id
+            )
+        )
+    )
+
+    if result.rowcount == 0:
+        raise HTTPException(status_code=404, detail="Product not found in your catalog")
+
+    # Create audit log
+    audit_log = AuditLog(
+        trader_id=trader.id,
+        action="PRODUCT_DELETE",
+        entity="product",
+        entity_id=product_id,
+        audit_data={"product_id": product_id}
+    )
+    db.add(audit_log)
+    await db.commit()
+
+    return {"message": "Product removed from your catalog successfully"}
 
 
 # Customer routes removed - not in MVP spec
@@ -442,105 +519,4 @@ async def profile(
     )
 
 
-@router.post("/sync/products")
-async def sync_products_web(
-    request: Request,
-    trader: Trader = Depends(get_trader_from_session),
-    db: AsyncSession = Depends(get_db)
-):
-    from app.services.sync import sync_products_from_admin
-    from app.core.admin_client import admin_client
-    import logging
-
-    logger = logging.getLogger(__name__)
-    backend_access_token = request.session.get("backend_access_token")
-    backend_refresh_token = request.session.get("backend_refresh_token")
-
-    logger.info(f"Sync products - trader: {trader.id}, backend_token: {bool(backend_access_token)}, refresh: {bool(backend_refresh_token)}")
-    logger.info(f"Session keys: {list(request.session.keys())}")
-
-    if not backend_access_token or not backend_refresh_token:
-        logger.warning(f"Missing backend tokens - access: {bool(backend_access_token)}, refresh: {bool(backend_refresh_token)}")
-        return HTMLResponse(
-            content='<div class="alert alert-danger alert-dismissible fade show" role="alert"><i class="bi bi-exclamation-circle"></i> Not authenticated. Please log in again.<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>',
-            status_code=401
-        )
-
-    try:
-        result = await sync_products_from_admin(db, trader, backend_access_token)
-        return HTMLResponse(
-            content='<div class="alert alert-success alert-dismissible fade show" role="alert"><i class="bi bi-check-circle"></i> Product sync initiated successfully! Products will be updated shortly.<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>',
-            status_code=200
-        )
-    except Exception as e:
-        error_msg = str(e)
-        if "expired" in error_msg.lower() or "invalid" in error_msg.lower() or "not approved" in error_msg.lower():
-            try:
-                backend_tokens = await admin_client.refresh_backend_token(backend_refresh_token)
-                request.session["backend_access_token"] = backend_tokens.get("accessToken")
-                request.session["backend_refresh_token"] = backend_tokens.get("refreshToken")
-
-                result = await sync_products_from_admin(db, trader, backend_tokens.get("accessToken"))
-                return HTMLResponse(
-                    content='<div class="alert alert-success alert-dismissible fade show" role="alert"><i class="bi bi-check-circle"></i> Product sync initiated successfully! Products will be updated shortly.<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>',
-                    status_code=200
-                )
-            except Exception as refresh_error:
-                return HTMLResponse(
-                    content=f'<div class="alert alert-danger alert-dismissible fade show" role="alert"><i class="bi bi-exclamation-circle"></i> Token refresh failed: {str(refresh_error)}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>',
-                    status_code=401
-                )
-
-        return HTMLResponse(
-            content=f'<div class="alert alert-danger alert-dismissible fade show" role="alert"><i class="bi bi-exclamation-circle"></i> Sync failed: {str(e)}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>',
-            status_code=500
-        )
-
-
-@router.post("/sync/orders")
-async def sync_orders_web(
-    request: Request,
-    trader: Trader = Depends(get_trader_from_session),
-    db: AsyncSession = Depends(get_db)
-):
-    from app.services.sync import sync_orders_from_admin
-    from app.core.admin_client import admin_client
-
-    backend_access_token = request.session.get("backend_access_token")
-    backend_refresh_token = request.session.get("backend_refresh_token")
-
-    if not backend_access_token or not backend_refresh_token:
-        return HTMLResponse(
-            content='<div class="alert alert-danger alert-dismissible fade show" role="alert"><i class="bi bi-exclamation-circle"></i> Not authenticated. Please log in again.<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>',
-            status_code=401
-        )
-
-    try:
-        result = await sync_orders_from_admin(db, trader, backend_access_token)
-        return HTMLResponse(
-            content='<div class="alert alert-success alert-dismissible fade show" role="alert"><i class="bi bi-check-circle"></i> Order sync initiated successfully! Orders will be updated shortly.<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>',
-            status_code=200
-        )
-    except Exception as e:
-        error_msg = str(e)
-        if "expired" in error_msg.lower() or "invalid" in error_msg.lower() or "not approved" in error_msg.lower():
-            try:
-                backend_tokens = await admin_client.refresh_backend_token(backend_refresh_token)
-                request.session["backend_access_token"] = backend_tokens.get("accessToken")
-                request.session["backend_refresh_token"] = backend_tokens.get("refreshToken")
-
-                result = await sync_orders_from_admin(db, trader, backend_tokens.get("accessToken"))
-                return HTMLResponse(
-                    content='<div class="alert alert-success alert-dismissible fade show" role="alert"><i class="bi bi-check-circle"></i> Order sync initiated successfully! Orders will be updated shortly.<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>',
-                    status_code=200
-                )
-            except Exception as refresh_error:
-                return HTMLResponse(
-                    content=f'<div class="alert alert-danger alert-dismissible fade show" role="alert"><i class="bi bi-exclamation-circle"></i> Token refresh failed: {str(refresh_error)}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>',
-                    status_code=401
-                )
-
-        return HTMLResponse(
-            content=f'<div class="alert alert-danger alert-dismissible fade show" role="alert"><i class="bi bi-exclamation-circle"></i> Sync failed: {str(e)}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>',
-            status_code=500
-        )
+# Legacy sync routes removed - use /products/browse instead

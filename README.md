@@ -1,41 +1,64 @@
-# Trader CMS Backend
+# Broker CMS - Complete E-Commerce System
 
-Backend for Trader CMS - a web-based storefront management system for sellers. Trader CMS syncs products from Admin API, stores locally, and allows traders to customize presentation.
+Complete e-commerce platform with **Trader CMS** (admin panel) and **Customer Shop** (storefront).
 
-## Quick Start
+## 🚀 Quick Start with Docker (Recommended)
 
 ### Prerequisites
-- Python 3.10+
-- PostgreSQL 12+
-- pip/venv
+- Docker Desktop installed and running
 
-### Installation
+### Start All Services
 
-1. **Clone and setup**
 ```bash
-cd trader-cms
+docker compose up --build
+```
+
+This starts:
+- **PostgreSQL Database** (port 5432)
+- **Trader CMS** (port 8000) - Admin panel
+- **Customer Shop** (port 8001) - Storefront
+
+### Access Applications
+
+**Trader CMS (Admin Panel)**
+- http://localhost:8000
+- API Docs: http://localhost:8000/api/docs
+
+**Customer Shop (Storefront)**
+- http://localhost:8001
+- API Docs: http://localhost:8001/api/docs
+
+### Stop Services
+
+```bash
+docker compose down
+```
+
+## 📦 Manual Installation (Without Docker)
+
+### Prerequisites
+- Python 3.11+
+- PostgreSQL 15+
+
+### 1. Trader CMS
+
+```bash
 python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+source venv/bin/activate  # Windows: venv\Scripts\activate
 pip install -r requirements.txt
-```
-
-2. **Configure environment**
-```bash
-# Edit .env with your database credentials
-DATABASE_URL=postgresql+asyncpg://user:password@localhost:5432/trader_cms
-```
-
-3. **Run migrations**
-```bash
 alembic upgrade head
+uvicorn app.main:app --port 8000 --reload
 ```
 
-4. **Start server**
+### 2. Customer Shop
+
 ```bash
-uvicorn app.main:app --reload
+cd shop
+python -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+pip install -r requirements.txt
+uvicorn app.main:app --port 8001 --reload
 ```
-
-Server runs at `http://localhost:8000`
 
 ## API Documentation
 

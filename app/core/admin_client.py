@@ -170,61 +170,36 @@ class AdminAPIClient:
         try:
             client = await self._get_client()
 
-            # Strategy: Use public endpoint for category filtering
+            # Use public endpoint for all products (with or without category filter)
+            params = {}
             if category_id:
+                params["categoryId"] = category_id
                 logger.info(f"Browsing products with category filter {category_id}")
-                response = await client.get(
-                    f"{self.base_url}/api/v1/products",
-                    params={"categoryId": category_id}
-                )
-                response.raise_for_status()
-                data = response.json()
-
-                # Transform ProductResponse to browse format
-                products = [
-                    {
-                        "sourceId": prod["id"],
-                        "title": prod["name"],
-                        "price": prod["price"],
-                        "centralStock": prod["stockQuantity"],
-                        "category": {
-                            "sourceId": category_id,
-                            "name": prod["categoryName"]
-                        },
-                        "version": "v1"  # Public endpoint doesn't have version
-                    }
-                    for prod in data
-                ]
             else:
-                # Strategy: Use sync endpoint for all products (has pagination)
-                headers = {
-                    "Authorization": f"Bearer {access_token}",
-                    "X-API-KEY": api_key
-                }
-                logger.info(f"Browsing all products from backend - page: {page}")
-                response = await client.get(
-                    f"{self.base_url}/api/v1/admin/sync/products",
-                    headers=headers,
-                    params={"page": page}
-                )
-                response.raise_for_status()
-                data = response.json()
+                logger.info("Browsing all products from backend")
 
-                # Transform AdminSyncProductDto to browse format
-                products = [
-                    {
-                        "sourceId": p["sourceId"],
-                        "title": p["title"],
-                        "price": p["price"],
-                        "centralStock": p["centralStock"],
-                        "category": {
-                            "sourceId": 0,  # Not available from sync endpoint
-                            "name": p["category"]
-                        },
-                        "version": p["version"]
-                    }
-                    for p in data.get("products", [])
-                ]
+            response = await client.get(
+                f"{self.base_url}/api/v1/products",
+                params=params
+            )
+            response.raise_for_status()
+            data = response.json()
+
+            # Transform ProductResponse to browse format
+            products = [
+                {
+                    "sourceId": prod["id"],
+                    "title": prod["name"],
+                    "price": prod["price"],
+                    "centralStock": prod["stockQuantity"],
+                    "category": {
+                        "sourceId": prod.get("categoryId", 0),
+                        "name": prod["categoryName"]
+                    },
+                    "version": "v1"  # Public endpoint doesn't have version
+                }
+                for prod in data
+            ]
 
             # Apply search filter client-side (works for both endpoints)
             if search:
@@ -257,7 +232,7 @@ class AdminAPIClient:
     async def browse_categories(self, access_token: str, api_key: str) -> dict:
         """
         Fetches available categories for browsing
-        Uses the public categories endpoint
+        Uses the public categories endpoint (no auth required)
         """
         try:
             client = await self._get_client()

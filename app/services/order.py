@@ -57,6 +57,31 @@ async def get_trader_orders(
     return order_responses, total_count
 
 
+async def get_orders_count_by_status(
+    db: AsyncSession,
+    trader_id: int,
+    status: str = None
+) -> int:
+    """Get count of orders, optionally filtered by status"""
+    query = select(func.count(Order.id)).where(Order.trader_id == trader_id)
+
+    if status:
+        # Map status string to OrderStatus enum
+        status_mapping = {
+            "in_progress": [OrderStatus.ASSIGNED, OrderStatus.ACCEPTED, OrderStatus.PICKED_UP, OrderStatus.IN_TRANSIT],
+            "pending": [OrderStatus.PENDING],
+            "delivered": [OrderStatus.DELIVERED],
+            "failed": [OrderStatus.FAILED]
+        }
+
+        if status.lower() in status_mapping:
+            status_list = status_mapping[status.lower()]
+            query = query.where(Order.status.in_(status_list))
+
+    result = await db.execute(query)
+    return result.scalar() or 0
+
+
 async def get_trader_stats(db: AsyncSession, trader_id: int) -> OrderStats:
     total_result = await db.execute(
         select(func.count(Order.id), func.sum(Order.total)).where(Order.trader_id == trader_id)

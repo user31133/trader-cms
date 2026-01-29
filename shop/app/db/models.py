@@ -1,15 +1,13 @@
+"""
+Shop database models - imports from shared database via same connection.
+Models are redefined here to avoid complex imports from trader-cms.
+"""
 from datetime import datetime
 from sqlalchemy import Column, Integer, String, Text, Numeric, Boolean, DateTime, ForeignKey, JSON, Enum as SQLEnum, UniqueConstraint
 from sqlalchemy.orm import relationship
 import enum
 
 from app.db.base import Base
-
-
-class TraderStatus(str, enum.Enum):
-    PENDING = "PENDING"
-    ACTIVE = "ACTIVE"
-    REJECTED = "REJECTED"
 
 
 class OrderStatus(str, enum.Enum):
@@ -22,6 +20,20 @@ class OrderStatus(str, enum.Enum):
     FAILED = "FAILED"
 
 
+class ShopCustomer(Base):
+    __tablename__ = "shop_customers"
+
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String(255), unique=True, index=True, nullable=False)
+    password_hash = Column(String(255), nullable=False)
+    full_name = Column(String(255), nullable=False)
+    phone = Column(String(50), nullable=True)
+    address = Column(Text, nullable=True)
+    city = Column(String(100), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+
 class Trader(Base):
     __tablename__ = "traders"
 
@@ -31,13 +43,8 @@ class Trader(Base):
     business_name = Column(String(255), nullable=False)
     backend_user_id = Column(Integer, nullable=True, index=True)
     api_key = Column(String(255), unique=True, nullable=True, index=True)
-    status = Column(SQLEnum(TraderStatus), default=TraderStatus.PENDING, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
-
-    trader_products = relationship("TraderProduct", back_populates="trader")
-    orders = relationship("Order", back_populates="trader")
-    audit_logs = relationship("AuditLog", back_populates="trader")
 
 
 class Category(Base):
@@ -83,7 +90,6 @@ class TraderProduct(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
-    trader = relationship("Trader", back_populates="trader_products")
     product = relationship("Product", back_populates="trader_products")
 
     __table_args__ = (
@@ -100,11 +106,9 @@ class Order(Base):
     customer_email = Column(String(255), nullable=True)
     total = Column(Numeric(10, 2), nullable=False)
     status = Column(SQLEnum(OrderStatus), default=OrderStatus.PENDING, nullable=False)
+    version = Column(String(255), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    synced_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    version = Column(String(255), nullable=True)
 
-    trader = relationship("Trader", back_populates="orders")
     items = relationship("OrderItem", back_populates="order")
 
 
@@ -112,7 +116,7 @@ class OrderItem(Base):
     __tablename__ = "order_items"
 
     id = Column(Integer, primary_key=True, index=True)
-    order_id = Column(Integer, ForeignKey("orders.id"), nullable=False)
+    order_id = Column(Integer, ForeignKey("orders.id"), nullable=False, index=True)
     product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
     quantity = Column(Integer, nullable=False)
     price_snapshot = Column(Numeric(10, 2), nullable=False)
@@ -121,42 +125,14 @@ class OrderItem(Base):
     product = relationship("Product", back_populates="order_items")
 
 
-class AuditLog(Base):
-    __tablename__ = "audit_logs"
-
-    id = Column(Integer, primary_key=True, index=True)
-    trader_id = Column(Integer, ForeignKey("traders.id"), nullable=True, index=True)
-    action = Column(String(50), nullable=False, index=True)
-    entity = Column(String(50), nullable=False)
-    entity_id = Column(Integer, nullable=True)
-    audit_data = Column(JSON, default=dict, nullable=False)
-    timestamp = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
-
-    trader = relationship("Trader", back_populates="audit_logs")
-
-
-class CartItem(Base):
-    __tablename__ = "cart_items"
-
-    id = Column(Integer, primary_key=True, index=True)
-    trader_id = Column(Integer, ForeignKey("traders.id"), nullable=False, index=True)
-    product_source_id = Column(Integer, nullable=False, index=True)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-
-    __table_args__ = (
-        UniqueConstraint('trader_id', 'product_source_id', name='_trader_product_uc'),
-    )
-
-
-class ShopCustomer(Base):
-    __tablename__ = "shop_customers"
-
-    id = Column(Integer, primary_key=True, index=True)
-    email = Column(String(255), unique=True, index=True, nullable=False)
-    password_hash = Column(String(255), nullable=False)
-    full_name = Column(String(255), nullable=False)
-    phone = Column(String(50), nullable=True)
-    address = Column(Text, nullable=True)
-    city = Column(String(100), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+__all__ = [
+    "ShopCustomer",
+    "Product",
+    "Category",
+    "TraderProduct",
+    "Order",
+    "OrderItem",
+    "Trader",
+    "OrderStatus",
+    "Base"
+]

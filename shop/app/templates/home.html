@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+
+{% block title %}Home{% endblock %}
+
+{% block content %}
+<div class="row mb-5 align-items-center">
+    <div class="col-lg-6">
+        <h1 class="display-5 fw-extrabold mb-2">Explore Our Collection</h1>
+        <p class="text-muted lead">Find the best products curated just for you.</p>
+    </div>
+    <div class="col-lg-6">
+        <form class="row g-2 justify-content-lg-end" method="GET" action="/products">
+            <div class="col-auto">
+                <select name="category_id" class="form-select shadow-sm" onchange="this.form.submit()">
+                    <option value="">All Categories</option>
+                    {% for cat in categories %}
+                    <option value="{{ cat.id }}" {% if current_category == cat.id %}selected{% endif %}>
+                        {{ cat.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-6">
+                <div class="input-group shadow-sm">
+                    <input type="text" name="search" class="form-control" placeholder="Search products..." value="{{ current_search or '' }}">
+                    <button class="btn btn-primary px-3" type="submit">
+                        <i class="bi bi-search"></i>
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="product-grid">
+    {% for product in products %}
+    <div class="product-card">
+        <a href="/products/{{ product.id }}" class="text-decoration-none">
+            <div class="image-container">
+                {% if product.local_images %}
+                <img src="{{ product.local_images[0] }}" alt="{{ product.title }}" class="product-image">
+                {% else %}
+                <div class="placeholder-image">
+                    <i class="bi bi-image"></i>
+                </div>
+                {% endif %}
+            </div>
+        </a>
+        <div class="card-content">
+            <span class="category-tag">{{ product.category.name }}</span>
+            <h5 class="product-title">
+                <a href="/products/{{ product.id }}" class="text-decoration-none text-dark">{{ product.title }}</a>
+            </h5>
+            <div class="price-stock">
+                <span class="product-price">${{ "%.2f"|format(product.price) }}</span>
+                <span class="stock-status">
+                    {% if product.stock > 0 %}
+                    <i class="bi bi-check-circle-fill text-success me-1"></i>Stock: {{ product.stock }}
+                    {% else %}
+                    <i class="bi bi-x-circle-fill text-danger me-1"></i>Out of Stock
+                    {% endif %}
+                </span>
+            </div>
+            <button class="btn btn-primary btn-add-to-cart" onclick="addToCart({{ product.id }})" {% if product.stock <= 0 %}disabled{% endif %}>
+                <i class="bi bi-cart-plus"></i> Add to Cart
+            </button>
+        </div>
+    </div>
+    {% else %}
+    <div class="col-12 text-center py-5">
+        <div class="mb-4">
+            <i class="bi bi-search text-muted" style="font-size: 4rem;"></i>
+        </div>
+        <h3 class="fw-bold">No products found</h3>
+        <p class="text-muted">We couldn't find anything matching your filters.</p>
+        <a href="/products" class="btn btn-primary mt-3 px-4">Clear all filters</a>
+    </div>
+    {% endfor %}
+</div>
+
+{% if total_pages > 1 %}
+<nav class="mt-5">
+    <ul class="pagination justify-content-center">
+        <li class="page-item {% if page == 1 %}disabled{% endif %}">
+            <a class="page-link shadow-sm" href="?page={{ page - 1 }}{% if current_category %}&category_id={{ current_category }}{% endif %}{% if current_search %}&search={{ current_search }}{% endif %}">
+                <i class="bi bi-chevron-left"></i>
+            </a>
+        </li>
+        {% for p in range(1, total_pages + 1) %}
+        {% if p == page %}
+        <li class="page-item active"><span class="page-link shadow-sm">{{ p }}</span></li>
+        {% else %}
+        <li class="page-item"><a class="page-link shadow-sm" href="?page={{ p }}{% if current_category %}&category_id={{ current_category }}{% endif %}{% if current_search %}&search={{ current_search }}{% endif %}">{{ p }}</a></li>
+        {% endif %}
+        {% endfor %}
+        <li class="page-item {% if page == total_pages %}disabled{% endif %}">
+            <a class="page-item shadow-sm" href="?page={{ page + 1 }}{% if current_category %}&category_id={{ current_category }}{% endif %}{% if current_search %}&search={{ current_search }}{% endif %}">
+                <span class="page-link"><i class="bi bi-chevron-right"></i></span>
+            </a>
+        </li>
+    </ul>
+</nav>
+{% endif %}
+{% endblock %}

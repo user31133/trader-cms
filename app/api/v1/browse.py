@@ -5,7 +5,7 @@ import logging
 
 from app.db.session import get_db
 from app.db.models import Trader
-from app.api.dependencies import get_current_trader
+from app.api.dependencies import get_trader_from_session
 from app.core.admin_client import admin_client
 from app.schemas.browse import (
     BrowseProductsResponse,
@@ -25,7 +25,7 @@ async def browse_products(
     limit: int = 20,
     category_id: Optional[int] = None,
     search: Optional[str] = None,
-    trader: Trader = Depends(get_current_trader),
+    trader: Trader = Depends(get_trader_from_session),
 ):
     """Browse all available products from backend"""
     backend_token = request.session.get("backend_access_token")
@@ -51,7 +51,7 @@ async def browse_products(
 
 
 @router.get("/categories", response_model=List[BrowseCategoryResponse])
-async def browse_categories(request: Request, trader: Trader = Depends(get_current_trader)):
+async def browse_categories(request: Request, trader: Trader = Depends(get_trader_from_session)):
     """Browse all available categories from backend"""
     backend_token = request.session.get("backend_access_token")
     if not backend_token:
@@ -71,10 +71,11 @@ async def browse_categories(request: Request, trader: Trader = Depends(get_curre
 async def add_to_cart(
     request: Request,
     data: SelectionCartRequest,
-    trader: Trader = Depends(get_current_trader)
+    trader: Trader = Depends(get_trader_from_session),
+    db: AsyncSession = Depends(get_db)
 ):
     """Add products to selection cart"""
-    cart = SelectionCartService.add_to_cart(request.session, data.productSourceIds)
+    cart = await SelectionCartService.add_to_cart(db, trader.id, data.productSourceIds)
     return {"cart": cart, "count": len(cart)}
 
 
@@ -82,48 +83,73 @@ async def add_to_cart(
 async def remove_from_cart(
     request: Request,
     data: SelectionCartRequest,
-    trader: Trader = Depends(get_current_trader)
+    trader: Trader = Depends(get_trader_from_session),
+    db: AsyncSession = Depends(get_db)
 ):
     """Remove products from selection cart"""
-    cart = SelectionCartService.remove_from_cart(request.session, data.productSourceIds)
+    cart = await SelectionCartService.remove_from_cart(db, trader.id, data.productSourceIds)
     return {"cart": cart, "count": len(cart)}
 
 
 @router.get("/cart")
-async def get_cart(request: Request, trader: Trader = Depends(get_current_trader)):
+async def get_cart(
+    request: Request,
+    trader: Trader = Depends(get_trader_from_session),
+    db: AsyncSession = Depends(get_db)
+):
     """Get current selection cart"""
-    cart = SelectionCartService.get_cart_from_session(request.session)
+    cart = await SelectionCartService.get_cart(db, trader.id)
     return {"cart": cart, "count": len(cart)}
 
 
 @router.post("/cart/save")
 async def save_cart(
     request: Request,
-    trader: Trader = Depends(get_current_trader),
+    trader: Trader = Depends(get_trader_from_session),
     db: AsyncSession = Depends(get_db)
 ):
     """Save selected products to trader's product list"""
-    cart = SelectionCartService.get_cart_from_session(request.session)
+    cart = await SelectionCartService.get_cart(db, trader.id)
     if not cart:
         raise HTTPException(status_code=400, detail="Cart is empty")
 
-    browse_cache = request.session.get("browse_cache", [])
-    if not browse_cache:
-        raise HTTPException(status_code=400, detail="No cached data. Browse products again.")
+    backend_token = request.session.get("backend_access_token")
+    if not backend_token:
+        raise HTTPException(status_code=401, detail="Backend authentication required")
+
+    try:
+        # Fetch all products to find the ones in cart
+        result = await admin_client.browse_products(
+            access_token=backend_token,
+            api_key=trader.api_key or "",
+            page=0,
+            limit=1000  # Get all products
+        )
+        available_products = result["products"]
+    except Exception as e:
+        logger.error(f"Failed to fetch products for save: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to fetch product data from backend"
+        )
 
     result = await save_selected_products(
         db=db,
         trader_id=trader.id,
         selected_source_ids=cart,
-        available_products=browse_cache
+        available_products=available_products
     )
 
-    SelectionCartService.clear_cart(request.session)
+    await SelectionCartService.clear_cart(db, trader.id)
     return result
 
 
 @router.post("/cart/clear")
-async def clear_cart(request: Request, trader: Trader = Depends(get_current_trader)):
+async def clear_cart(
+    request: Request,
+    trader: Trader = Depends(get_trader_from_session),
+    db: AsyncSession = Depends(get_db)
+):
     """Clear selection cart"""
-    SelectionCartService.clear_cart(request.session)
+    await SelectionCartService.clear_cart(db, trader.id)
     return {"cart": [], "count": 0}

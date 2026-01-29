@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+
+{% block title %}{{ product.title }}{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-5">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="/" class="text-decoration-none">Home</a></li>
+        <li class="breadcrumb-item"><a href="/products?category_id={{ product.category.id }}" class="text-decoration-none">{{ product.category.name }}</a></li>
+        <li class="breadcrumb-item active" aria-current="page">{{ product.title }}</li>
+    </ol>
+</nav>
+
+<div class="row g-5">
+    <div class="col-lg-6">
+        <div class="image-detail-container bg-light rounded-4 overflow-hidden border">
+            <div class="image-container" style="padding-top: 100%;">
+                {% if product.local_images %}
+                <img src="{{ product.local_images[0] }}" alt="{{ product.title }}" class="product-image">
+                {% else %}
+                <div class="placeholder-image">
+                    <i class="bi bi-image" style="font-size: 8rem;"></i>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-6">
+        <div class="ps-lg-4">
+            <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-3 py-2 rounded-pill mb-3">
+                {{ product.category.name }}
+            </span>
+            <h1 class="display-5 fw-bold mb-3">{{ product.title }}</h1>
+            
+            <div class="d-flex align-items-center gap-3 mb-4">
+                <span class="h2 fw-extrabold mb-0 text-primary">${{ "%.2f"|format(product.price) }}</span>
+                <span class="badge {% if product.stock > 0 %}bg-success-subtle text-success{% else %}bg-danger-subtle text-danger{% endif %} px-3 py-2 rounded-pill">
+                    {% if product.stock > 0 %}In Stock: {{ product.stock }}{% else %}Out of Stock{% endif %}
+                </span>
+            </div>
+            
+            <div class="mb-5">
+                <h5 class="fw-bold mb-3">Description</h5>
+                <div class="text-muted lead fs-6 lh-lg">
+                    {{ product.local_description or "No description available for this product." }}
+                </div>
+            </div>
+            
+            {% if product.stock > 0 %}
+            <div class="card border-0 bg-light rounded-4 p-4 mb-4">
+                <div class="row g-3 align-items-end">
+                    <div class="col-md-4">
+                        <label for="quantity" class="form-label fw-bold small text-uppercase">Quantity</label>
+                        <select id="quantity" class="form-select shadow-none">
+                            {% for i in range(1, (product.stock if product.stock < 10 else 11)) %}
+                            <option value="{{ i }}">{{ i }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-8">
+                        <button class="btn btn-primary btn-lg w-100 py-3 fw-bold rounded-3 shadow-sm d-flex align-items-center justify-content-center gap-2" onclick="addToCart({{ product.id }}, document.getElementById('quantity').value)">
+                            <i class="bi bi-cart-plus fs-5"></i>
+                            <span>Add to Shopping Bag</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

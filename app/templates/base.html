@@ -26,18 +26,24 @@
             </div>
             <ul class="nav flex-column p-3">
                 <li class="nav-item">
-                    <a class="nav-link {% if request.url.path == '/dashboard' %}active{% endif %}" href="/dashboard">
-                        <i class="bi bi-graph-up"></i> Dashboard
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link {% if '/products' in request.url.path %}active{% endif %}" href="/products">
+                    <a class="nav-link {% if '/products' in request.url.path and '/browse' not in request.url.path %}active{% endif %}" href="/products">
                         <i class="bi bi-box"></i> Products
                     </a>
                 </li>
                 <li class="nav-item">
                     <a class="nav-link {% if '/orders' in request.url.path %}active{% endif %}" href="/orders">
                         <i class="bi bi-bag"></i> Orders
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if '/browse' in request.url.path %}active{% endif %}" href="/products/browse">
+                        <i class="bi bi-search"></i> Browse
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if '/cart' in request.url.path %}active{% endif %}" href="/cart">
+                        <i class="bi bi-hourglass-split"></i> In Progress
+                        <span class="badge bg-primary ms-2" id="sidebar-cart-badge">0</span>
                     </a>
                 </li>
             </ul>
@@ -95,6 +101,26 @@
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
     <script src="/static/js/main.js"></script>
+    <script>
+        // Global cart badge update function
+        async function updateGlobalCartBadge() {
+            try {
+                const res = await fetch('/api/v1/browse/cart');
+                const data = await res.json();
+                const badge = document.getElementById('sidebar-cart-badge');
+                if (badge) {
+                    badge.textContent = data.count;
+                }
+            } catch (e) {
+                console.error('Failed to update cart badge:', e);
+            }
+        }
+
+        // Update cart badge on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            updateGlobalCartBadge();
+        });
+    </script>
     {% block extra_js %}{% endblock %}
 </body>
 </html>

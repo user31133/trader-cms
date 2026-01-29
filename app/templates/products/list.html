@@ -5,23 +5,52 @@
 
 {% block content %}
 <div class="container-fluid">
-    <div class="row mb-4">
-        <div class="col-md-6">
+    <div class="row mb-4 align-items-center">
+        <div class="col-md-4">
             <h4>Your Products</h4>
+            <p class="text-muted small mb-0">Manage your product catalog</p>
         </div>
-        <div class="col-md-6 text-end">
-            <a href="/products/browse" class="btn btn-primary me-2">
+        <div class="col-md-8 text-end">
+            <a href="/products/browse" class="btn btn-primary">
                 <i class="bi bi-search"></i> Browse & Add Products
             </a>
-            <button class="btn btn-success" hx-post="/sync/products" hx-indicator="#loading">
-                <i class="bi bi-arrow-clockwise"></i> Sync All Products
-            </button>
         </div>
     </div>
 
-    <!-- Loading Indicator -->
-    <div id="loading" class="htmx-indicator alert alert-info mb-3" style="display:none;">
-        <i class="bi bi-hourglass-split"></i> Syncing products...
+    {% if request.query_params.get('success') %}
+    <div class="alert alert-success alert-dismissible fade show mb-3" role="alert">
+        <i class="bi bi-check-circle me-1"></i> {{ request.query_params.get('success') }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    {% endif %}
+
+    <!-- Filters -->
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label for="category-filter" class="form-label small fw-bold text-uppercase text-muted">Category</label>
+                    <select class="form-select" id="category-filter" name="category_id">
+                        <option value="">All Categories</option>
+                        {% for category in categories %}
+                        <option value="{{ category.id }}" {% if selected_category == category.id %}selected{% endif %}>
+                            {{ category.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-6 d-flex align-items-end">
+                    <span class="text-muted small">Showing {{ products|length }} of {{ total_count }} products</span>
+                </div>
+                <div class="col-md-2 d-flex align-items-end justify-content-end">
+                    {% if selected_category %}
+                    <a href="/products" class="btn btn-outline-secondary">
+                        <i class="bi bi-x-circle"></i> Reset
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Products Table -->
@@ -35,7 +64,6 @@
                         <th>Category</th>
                         <th>Price</th>
                         <th>Stock</th>
-                        <th>Visibility</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
@@ -60,14 +88,6 @@
                                 <small class="text-muted">{{ product.central_stock }} units</small>
                             </td>
                             <td>
-                                <div class="form-check form-switch">
-                                    <input class="form-check-input visibility-toggle" type="checkbox"
-                                           {% if product.visibility %}checked{% endif %}
-                                           data-product-id="{{ product.id }}"
-                                           data-product-url="/api/v1/trader/products/{{ product.id }}">
-                                </div>
-                            </td>
-                            <td>
                                 <button class="btn btn-sm btn-outline-primary"
                                         hx-get="/products/{{ product.id }}/edit"
                                         hx-target="#modal-content"
@@ -80,8 +100,8 @@
                         {% endfor %}
                     {% else %}
                     <tr>
-                        <td colspan="7" class="text-center py-4 text-muted">
-                            No products found. <a href="#" hx-post="/sync/products">Sync from Admin API</a> to get started.
+                        <td colspan="6" class="text-center py-4 text-muted">
+                            No products found. <a href="/products/browse">Browse & Add Products</a> to get started.
                         </td>
                     </tr>
                     {% endif %}
@@ -104,6 +124,16 @@
 </div>
 
 <script>
+    // Category filter change handler
+    document.getElementById('category-filter').addEventListener('change', function() {
+        const categoryId = this.value;
+        if (categoryId) {
+            window.location.href = `/products?category_id=${categoryId}`;
+        } else {
+            window.location.href = '/products';
+        }
+    });
+
     // Sortable drag-drop
     const el = document.getElementById('products-list');
     if (el && typeof Sortable !== 'undefined') {
@@ -125,41 +155,6 @@
     } else if (el) {
         console.warn('Sortable library not loaded');
     }
-
-    // Visibility toggle
-    document.querySelectorAll('.visibility-toggle').forEach(el => {
-        el.addEventListener('change', async function(event) {
-            event.preventDefault();
-            event.stopPropagation();
-
-            const url = this.getAttribute('data-product-url');
-            const checked = this.checked;
-            const data = {visibility: checked};
-
-            console.log('Visibility toggle clicked:', url, data);
-
-            try {
-                const response = await fetch(url, {
-                    method: 'PATCH',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    credentials: 'include',
-                    body: JSON.stringify(data)
-                });
-
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-
-                console.log('Visibility updated successfully');
-            } catch (error) {
-                console.error('Error updating visibility:', error);
-                this.checked = !checked; // Revert checkbox on error
-                alert('Failed to update product visibility. Please try again.');
-            }
-        });
-    });
 
     // Modal content
     document.getElementById('edit-modal').addEventListener('show.bs.modal', function(e) {

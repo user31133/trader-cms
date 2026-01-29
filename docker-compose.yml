@@ -1,38 +1,85 @@
-version: '3.8'
-
 services:
+  # PostgreSQL Database
   postgres:
     image: postgres:15-alpine
+    container_name: brokercms-db
     environment:
+      POSTGRES_DB: brokercms
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: trader_cms
+      POSTGRES_PASSWORD: postgres
     ports:
-      - "5433:5432"
+      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 10s
+      interval: 5s
       timeout: 5s
       retries: 5
 
-  app:
-    build: .
-    command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --log-level info"
+  # Trader CMS (Admin Panel)
+  trader-cms:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: brokercms-trader-cms
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/brokercms
+      ADMIN_API_BASE_URL: ${ADMIN_API_BASE_URL:-http://shopbackend:8080}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-change-this-secret-key-in-production}
+      SESSION_SECRET_KEY: ${SESSION_SECRET_KEY:-change-this-session-secret-in-production}
+      JWT_ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: 30
+      REFRESH_TOKEN_EXPIRE_DAYS: 7
     ports:
       - "8000:8000"
-    environment:
-      DATABASE_URL: postgresql+asyncpg://postgres:password@postgres:5432/trader_cms
-      ADMIN_API_BASE_URL: http://host.docker.internal:8080
-      JWT_SECRET_KEY: your-secret-key-change-in-production
-      SESSION_SECRET_KEY: another-secret-key-change-in-production
     depends_on:
       postgres:
         condition: service_healthy
     volumes:
       - .:/app
-      - /app/__pycache__
+      - trader_static:/app/static/uploads
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    networks:
+      - default
+      - backend
+
+  # Customer Shop (Storefront)
+  shop:
+    build:
+      context: ./shop
+      dockerfile: Dockerfile
+    container_name: brokercms-shop
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/brokercms
+      ADMIN_API_BASE_URL: ${ADMIN_API_BASE_URL:-http://shopbackend:8080}
+      JWT_SECRET_KEY: ${SHOP_JWT_SECRET_KEY:-change-this-shop-secret-key}
+      JWT_ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: 30
+      REFRESH_TOKEN_EXPIRE_DAYS: 7
+      SESSION_SECRET_KEY: ${SESSION_SECRET_KEY:-change-this-session-secret-key}
+      TRADER_ID: ${TRADER_ID:-1}
+      SHOP_NAME: ${SHOP_NAME:-My Shop}
+    ports:
+      - "8001:8001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      trader-cms:
+        condition: service_started
+    volumes:
+      - ./shop:/app
+      - ./app:/trader-cms/app:ro  # Mount trader-cms app directory as read-only
+    networks:
+      - default
+      - backend
 
 volumes:
   postgres_data:
+  trader_static:
+
+networks:
+  default:
+  backend:
+    external: true
+    name: online_shop-backend_default

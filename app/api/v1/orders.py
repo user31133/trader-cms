@@ -38,6 +38,21 @@ async def list_orders(
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 
+@router.get("/orders/count")
+async def get_orders_count(
+    status: str = None,
+    trader: Trader = Depends(get_current_trader),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get count of orders, optionally filtered by status"""
+    try:
+        from app.services.order import get_orders_count_by_status
+        count = await get_orders_count_by_status(db, trader.id, status)
+        return {"count": count}
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+
 @router.get("/stats", response_model=OrderStats)
 async def get_stats(
     trader: Trader = Depends(get_current_trader),

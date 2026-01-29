@@ -79,9 +79,9 @@
                 <div class="card-body">
                     <h5 class="card-title mb-3">Quick Actions</h5>
                     <div class="d-flex flex-wrap gap-2">
-                        <button class="btn btn-primary" hx-post="/sync/products" hx-target="#sync-status">
-                            <i class="bi bi-arrow-clockwise"></i> Sync Products
-                        </button>
+                        <a href="/products/browse" class="btn btn-primary">
+                            <i class="bi bi-search"></i> Browse & Add Products
+                        </a>
                         <a href="/products" class="btn btn-outline-primary">
                             <i class="bi bi-box"></i> Manage Products
                         </a>
@@ -93,9 +93,6 @@
             </div>
         </div>
     </div>
-
-    <!-- Sync Status -->
-    <div id="sync-status" class="mb-4"></div>
 
     <!-- Recent Orders -->
     <div class="row">
@@ -135,20 +132,11 @@
                         </table>
                     </div>
                     {% else %}
-                    <p class="text-muted text-center py-4">No orders yet. <a href="#" hx-post="/sync/orders">Sync orders</a> from Admin API.</p>
+                    <p class="text-muted text-center py-4">No orders yet. Orders will appear here when customers place orders.</p>
                     {% endif %}
                 </div>
             </div>
         </div>
     </div>
 </div>
-
-<script>
-    htmx.on('#sync-status', 'htmx:oobSwap', function(evt) {
-        const status = evt.detail.xhr.responseText;
-        if (status.includes('complete')) {
-            setTimeout(() => location.reload(), 2000);
-        }
-    });
-</script>
 {% endblock %}
