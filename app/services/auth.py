@@ -20,6 +20,16 @@ async def register_trader(db: AsyncSession, data: RegisterRequest) -> Trader:
         logger.warning(f"Registration attempt with existing email: {data.email}")
         raise ValueError("Email already registered")
 
+    # First, register with backend to get backend_user_id
+    logger.info(f"Calling backend registration for: {data.email}")
+    try:
+        backend_response = await admin_client.register_trader(data.email, data.business_name, data.password)
+        logger.info(f"Backend registration successful for {data.email}")
+    except Exception as e:
+        logger.error(f"Backend registration failed for {data.email}: {str(e)}")
+        raise ValueError(f"Backend registration failed: {str(e)}")
+
+    # Backend succeeded, now create local account
     logger.info(f"Creating local trader account for: {data.email}")
     trader = Trader(
         email=data.email,
@@ -27,20 +37,15 @@ async def register_trader(db: AsyncSession, data: RegisterRequest) -> Trader:
         business_name=data.business_name,
         status=TraderStatus.PENDING
     )
+
+    # Store backend_user_id if available
+    if backend_response.get("user") and backend_response["user"].get("id"):
+        trader.backend_user_id = backend_response["user"]["id"]
+        logger.info(f"Stored backend_user_id: {trader.backend_user_id}")
+
     db.add(trader)
     await db.flush()
     logger.info(f"Local trader account created with id: {trader.id}")
-
-    logger.info(f"Calling backend registration for: {data.email}")
-    try:
-        backend_response = await admin_client.register_trader(data.email, data.business_name, data.password)
-        logger.info(f"Backend registration successful for {data.email}: {backend_response}")
-
-        if backend_response.get("user") and backend_response["user"].get("id"):
-            trader.backend_user_id = backend_response["user"]["id"]
-            logger.info(f"Stored backend_user_id: {trader.backend_user_id} for trader {trader.id}")
-    except Exception as e:
-        logger.error(f"Backend registration failed for {data.email}: {str(e)}")
 
     audit_log = AuditLog(
         trader_id=trader.id,

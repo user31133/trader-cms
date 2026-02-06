@@ -15,13 +15,18 @@ for logger_name in ["app.core.admin_client", "app.services.auth", "app.services.
     module_logger.handlers = uvicorn_logger.handlers
     module_logger.propagate = False
 
-from fastapi import FastAPI, HTTPException, status
+from fastapi import FastAPI, HTTPException, status, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 
 from app.core.config import settings
+
+# Initialize templates with global context
+templates = Jinja2Templates(directory="app/templates")
+templates.env.globals["shop_name"] = settings.SHOP_NAME
 from app.api.v1.auth import router as auth_router
 from app.api.v1.sync import router as sync_router
 from app.api.v1.products import router as products_router
@@ -36,8 +41,8 @@ logger.info("Application startup - logging configured")
 
 
 app = FastAPI(
-    title="Trader CMS",
-    description="Backend for Trader CMS with product sync and management",
+    title=f"{settings.SHOP_NAME} CMS",
+    description="Shop CMS with product sync and management",
     version="1.0.0",
     openapi_url="/api/openapi.json",
     docs_url="/api/docs",
@@ -71,7 +76,22 @@ async def validation_exception_handler(request, exc):
 
 
 @app.exception_handler(HTTPException)
-async def http_exception_handler(request, exc):
+async def http_exception_handler(request: Request, exc: HTTPException):
+    # For 401 errors on web routes, redirect to login
+    if exc.status_code == 401:
+        # Check if this is an API request or web request
+        path = request.url.path
+        accept = request.headers.get("accept", "")
+
+        # API routes start with /api/v1 - return JSON for those
+        # For web routes (HTML pages), redirect to login
+        is_api_request = path.startswith("/api/v1") or "application/json" in accept
+
+        if not is_api_request:
+            # Clear session and redirect to login
+            request.session.clear()
+            return RedirectResponse(url="/login", status_code=302)
+
     return JSONResponse(
         status_code=exc.status_code,
         content={"detail": exc.detail},

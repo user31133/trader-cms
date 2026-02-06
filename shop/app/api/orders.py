@@ -105,7 +105,9 @@ async def create_order(
 
     except Exception as e:
         logger.warning(f"Failed to create order on backend (will save locally): {str(e)}")
-        # Continue to save locally even if backend fails
+        # Generate a local-only source_id (negative to avoid conflicts with backend IDs)
+        import time
+        backend_order_id = -int(time.time() * 1000) % 2147483647  # Negative timestamp-based ID
 
     # Save order locally
     try:
@@ -115,7 +117,8 @@ async def create_order(
             customer_email=order_data.customer_email,
             total=total,
             status=OrderStatus[backend_status] if backend_status in OrderStatus.__members__ else OrderStatus.PENDING,
-            version="v1"
+            version="v1",
+            synced_at=datetime.utcnow()
         )
         db.add(new_order)
         await db.flush()

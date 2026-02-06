@@ -1,11 +1,16 @@
 import logging
 import httpx
-from typing import Optional
+from typing import Optional, Tuple
 from datetime import datetime
 
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
+
+
+class TokenExpiredError(Exception):
+    """Raised when backend returns 401 - token needs refresh"""
+    pass
 
 
 class AdminAPIClient:
@@ -33,11 +38,14 @@ class AdminAPIClient:
             )
             response.raise_for_status()
             result = response.json()
-            logger.info(f"Backend registration successful for {email}: {result}")
+            logger.info(f"Backend registration successful for {email}")
             return result
+        except httpx.HTTPStatusError as e:
+            logger.error(f"Backend registration failed with status {e.response.status_code}: {e.response.text}")
+            raise Exception(f"Backend registration failed: {e.response.text}")
         except Exception as e:
             logger.error(f"Backend registration failed: {str(e)}")
-            return {"id": None, "status": "PENDING"}
+            raise Exception(f"Backend registration failed: {str(e)}")
 
     async def sync_products(self, access_token: str, api_key: str, since: Optional[str] = None, page: int = 0) -> dict:
         try:
@@ -73,6 +81,9 @@ class AdminAPIClient:
                 ]
             }
         except httpx.HTTPStatusError as e:
+            if e.response.status_code == 401:
+                logger.warning("Product sync failed: Token expired")
+                raise TokenExpiredError("Access token expired")
             if e.response.status_code == 403:
                 logger.warning(f"Product sync failed: Trader not approved or invalid API key")
                 raise Exception("Trader not approved or invalid API key")
@@ -94,9 +105,7 @@ class AdminAPIClient:
                 params["since"] = since
 
             url = f"{self.base_url}/api/v1/admin/sync/orders"
-            logger.info(f"Syncing orders from backend - URL: {url}, page: {page}, since: {since}")
-            logger.info(f"Request headers - Authorization: Bearer {access_token[:20]}..., X-API-KEY: {api_key}")
-            logger.info(f"Request params: {params}")
+            logger.info(f"Syncing orders from backend - page: {page}, since: {since}")
 
             response = await client.get(
                 url,
@@ -104,11 +113,8 @@ class AdminAPIClient:
                 params=params
             )
 
-            logger.info(f"Response status code: {response.status_code}")
-            logger.info(f"Response headers: {dict(response.headers)}")
-
             if response.status_code != 200:
-                logger.error(f"Response body: {response.text}")
+                logger.error(f"Order sync response status: {response.status_code}")
 
             response.raise_for_status()
             data = response.json()
@@ -140,6 +146,9 @@ class AdminAPIClient:
                 ]
             }
         except httpx.HTTPStatusError as e:
+            if e.response.status_code == 401:
+                logger.warning("Order sync failed: Token expired")
+                raise TokenExpiredError("Access token expired")
             if e.response.status_code == 403:
                 logger.warning(f"Order sync failed: Trader not approved or invalid API key")
                 raise Exception("Trader not approved or invalid API key")
@@ -361,6 +370,73 @@ class AdminAPIClient:
         except Exception as e:
             logger.error(f"OTP verification failed: {str(e)}")
             raise Exception(f"OTP verification failed: {str(e)}")
+
+    async def sync_products_with_refresh(
+        self,
+        access_token: str,
+        refresh_token: str,
+        api_key: str,
+        since: Optional[str] = None,
+        page: int = 0
+    ) -> Tuple[dict, Optional[str], Optional[str]]:
+        """
+        Sync products with automatic token refresh on 401.
+        Returns: (result, new_access_token, new_refresh_token)
+        If tokens are None, no refresh was needed.
+        """
+        try:
+            result = await self.sync_products(access_token, api_key, since, page)
+            return result, None, None
+        except TokenExpiredError:
+            logger.info("Token expired during product sync, attempting refresh...")
+            if not refresh_token:
+                raise Exception("Token expired and no refresh token available")
+
+            # Refresh the token
+            new_tokens = await self.refresh_backend_token(refresh_token)
+            new_access = new_tokens.get("accessToken")
+            new_refresh = new_tokens.get("refreshToken", refresh_token)
+
+            if not new_access:
+                raise Exception("Token refresh failed - no new access token returned")
+
+            # Retry with new token
+            result = await self.sync_products(new_access, api_key, since, page)
+            return result, new_access, new_refresh
+
+    async def sync_orders_with_refresh(
+        self,
+        backend_user_id: int,
+        access_token: str,
+        refresh_token: str,
+        api_key: str,
+        since: Optional[str] = None,
+        page: int = 0
+    ) -> Tuple[dict, Optional[str], Optional[str]]:
+        """
+        Sync orders with automatic token refresh on 401.
+        Returns: (result, new_access_token, new_refresh_token)
+        If tokens are None, no refresh was needed.
+        """
+        try:
+            result = await self.sync_orders(backend_user_id, access_token, api_key, since, page)
+            return result, None, None
+        except TokenExpiredError:
+            logger.info("Token expired during order sync, attempting refresh...")
+            if not refresh_token:
+                raise Exception("Token expired and no refresh token available")
+
+            # Refresh the token
+            new_tokens = await self.refresh_backend_token(refresh_token)
+            new_access = new_tokens.get("accessToken")
+            new_refresh = new_tokens.get("refreshToken", refresh_token)
+
+            if not new_access:
+                raise Exception("Token refresh failed - no new access token returned")
+
+            # Retry with new token
+            result = await self.sync_orders(backend_user_id, new_access, api_key, since, page)
+            return result, new_access, new_refresh
 
     async def refresh_backend_token(self, refresh_token: str) -> dict:
         try:

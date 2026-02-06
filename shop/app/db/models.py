@@ -14,10 +14,12 @@ class OrderStatus(str, enum.Enum):
     PENDING = "PENDING"
     CONFIRMED = "CONFIRMED"
     ASSIGNED = "ASSIGNED"
+    ACCEPTED = "ACCEPTED"
     PICKED_UP = "PICKED_UP"
     IN_TRANSIT = "IN_TRANSIT"
     DELIVERED = "DELIVERED"
     FAILED = "FAILED"
+    CANCELLED = "CANCELLED"
 
 
 class ShopCustomer(Base):
@@ -106,8 +108,9 @@ class Order(Base):
     customer_email = Column(String(255), nullable=True)
     total = Column(Numeric(10, 2), nullable=False)
     status = Column(SQLEnum(OrderStatus), default=OrderStatus.PENDING, nullable=False)
-    version = Column(String(255), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    synced_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    version = Column(String(255), nullable=True)
 
     items = relationship("OrderItem", back_populates="order")
 

@@ -14,8 +14,11 @@ from app.schemas.auth import LoginRequest, RegisterRequest
 from sqlalchemy import select
 
 
+from app.core.config import settings
+
 router = APIRouter(tags=["web"])
 templates = Jinja2Templates(directory="app/templates")
+templates.env.globals["shop_name"] = settings.SHOP_NAME
 
 
 async def get_trader_from_session(request: Request, db: AsyncSession = Depends(get_db)) -> Trader:

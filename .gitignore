@@ -31,6 +31,8 @@ env/
 .DS_Store
 .env
 .env.local
+.env.backup
+.env.*.local
 static/uploads/*
 !static/uploads/.gitkeep
 *.log

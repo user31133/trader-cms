@@ -1,259 +1,122 @@
-# Broker CMS - Complete E-Commerce System
+# Trader CMS
 
-Complete e-commerce platform with **Trader CMS** (admin panel) and **Customer Shop** (storefront).
+## Setup (from scratch)
 
-## 🚀 Quick Start with Docker (Recommended)
+### Step 1: Start Main Backend
 
-### Prerequisites
-- Docker Desktop installed and running
+```bash
+cd online_shop-backend
+docker compose up -d
+```
 
-### Start All Services
+Wait for backend to be ready at http://localhost:8081
+
+### Step 2: Register Trader Account
+
+```bash
+curl -X POST http://localhost:8081/api/v1/auth/register-trader \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "trader@example.com",
+    "password": "yourpassword",
+    "confirmPassword": "yourpassword",
+    "fullName": "Your Shop Name"
+  }'
+```
+
+Response:
+```json
+{
+  "message": "Trader registration successful! Please verify OTP...",
+  "user": { "id": 1, "email": "trader@example.com" },
+  "isOtpRequired": true,
+  "otpExpirationInSeconds": 300
+}
+```
+
+Save `user.id` as your TRADER_ID.
+
+### Step 3: Verify OTP
+
+Check email/console for OTP code, then:
+
+```bash
+curl -X POST http://localhost:8081/api/v1/auth/login/otp \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "trader@example.com",
+    "otp": "123456"
+  }'
+```
+
+### Step 4: Wait for Admin Approval
+
+Trader accounts require admin approval before login works.
+Admin must approve via backend admin panel.
+
+### Step 5: Configure CMS
+
+```bash
+cd trader-cms
+cp .env.example .env
+```
+
+Edit `.env`:
+```env
+SHOP_NAME=YourShopName         # No spaces in name
+TRADER_ID=1                    # CMS trader id (created after first login)
+ADMIN_API_BASE_URL=http://shopbackend:8080  # Docker internal port
+
+# Generate each secret:
+# python -c "import secrets; print(secrets.token_hex(32))"
+JWT_SECRET_KEY=your-generated-secret
+SHOP_JWT_SECRET_KEY=your-generated-secret
+SESSION_SECRET_KEY=your-generated-secret
+```
+
+> **Note**: Use port 8080 for Docker network (`shopbackend:8080`), port 8081 for host access (`localhost:8081`)
+
+### Step 6: Start CMS & Shop
 
 ```bash
 docker compose up --build
 ```
 
-This starts:
-- **PostgreSQL Database** (port 5432)
-- **Trader CMS** (port 8000) - Admin panel
-- **Customer Shop** (port 8001) - Storefront
+### Step 7: Login to CMS
 
-### Access Applications
+1. Open http://localhost:8000
+2. Login with trader email/password from Step 2
+3. If OTP required, enter code from email
+4. Sync products from main backend
+5. Enable visibility for products to show in shop
 
-**Trader CMS (Admin Panel)**
-- http://localhost:8000
-- API Docs: http://localhost:8000/api/docs
+### Step 8: Test Shop
 
-**Customer Shop (Storefront)**
-- http://localhost:8001
-- API Docs: http://localhost:8001/api/docs
+1. Open http://localhost:8001
+2. Browse products (only visible ones appear)
+3. Register as customer
+4. Add to cart, place order
 
-### Stop Services
+## Access
 
-```bash
-docker compose down
-```
+| Service | URL |
+|---------|-----|
+| CMS | http://localhost:8000 |
+| Shop | http://localhost:8001 |
 
-## 📦 Manual Installation (Without Docker)
+## Important Notes
 
-### Prerequisites
-- Python 3.11+
-- PostgreSQL 15+
+- **OTP Required**: All trader registrations require OTP verification
+- **Admin Approval**: Traders cannot login until admin approves account
+- **Product Visibility**: Products synced from backend are hidden by default - enable in CMS
+- **Shared Database**: CMS and Shop share the same PostgreSQL database
 
-### 1. Trader CMS
+## API Endpoints (Main Backend)
 
-```bash
-python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
-pip install -r requirements.txt
-alembic upgrade head
-uvicorn app.main:app --port 8000 --reload
-```
-
-### 2. Customer Shop
-
-```bash
-cd shop
-python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
-pip install -r requirements.txt
-uvicorn app.main:app --port 8001 --reload
-```
-
-## API Documentation
-
-- OpenAPI/Swagger: http://localhost:8000/api/docs
-- ReDoc: http://localhost:8000/api/redoc
-
-## Architecture
-
-### Core Components
-
-**Authentication**
-- JWT-based (access + refresh tokens)
-- POST `/api/v1/auth/register` - Register trader
-- POST `/api/v1/auth/login` - Login
-- POST `/api/v1/auth/refresh` - Refresh token
-
-**Product Sync**
-- POST `/api/v1/sync/products` - Sync from Admin API
-- GET `/api/v1/trader/products` - List products
-- PATCH `/api/v1/trader/products/{id}` - Edit local fields
-- POST `/api/v1/trader/products/reorder` - Reorder products
-
-**Customer Management**
-- POST `/api/v1/trader/customers` - Create customer
-- GET `/api/v1/trader/customers` - List customers
-- GET `/api/v1/trader/customers/{id}` - Get customer
-
-**Orders**
-- GET `/api/v1/trader/orders` - List orders (read-only)
-- GET `/api/v1/trader/stats` - Order statistics
-
-## Database Schema
-
-**Core Tables**
-- `traders` - Trader accounts (PENDING/ACTIVE/REJECTED)
-- `products` - Synced from Admin (price, stock read-only)
-- `trader_products` - Local customizations (description, images, visibility)
-- `customers` - Customer accounts created by traders
-- `orders` - Orders synced from Admin (read-only)
-- `order_items` - Order line items
-- `categories` - Product categories (synced from Admin)
-- `audit_logs` - All actions for compliance
-
-## Configuration
-
-### Environment Variables (.env)
-
-```env
-# Database
-DATABASE_URL=postgresql+asyncpg://postgres:password@localhost:5432/trader_cms
-
-# Admin API
-ADMIN_API_BASE_URL=http://localhost:8080/api/v1
-
-# JWT
-JWT_SECRET_KEY=your-secret-key-generate-new-in-production
-JWT_ALGORITHM=HS256
-ACCESS_TOKEN_EXPIRE_MINUTES=30
-REFRESH_TOKEN_EXPIRE_DAYS=7
-
-# Session
-SESSION_SECRET_KEY=another-secret-key-for-sessions
-
-# File Upload
-MAX_IMAGE_SIZE_MB=5
-UPLOAD_DIR=static/uploads
-```
-
-## Key Constraints
-
-### Read-Only Fields
-Trader CANNOT modify:
-- Product price
-- Central stock
-- Categories
-- Global product attributes
-
-### Data Isolation
-- Traders only see their own products, customers, orders
-- Customers scoped to creating trader only
-- Audit logs track all modifications
-
-### Admin API Integration
-Every sync request includes:
-- `Authorization: Bearer <access_token>`
-- `X-API-KEY: <trader_api_key>`
-
-## Development
-
-### Running Tests
-```bash
-pytest tests/
-```
-
-### Database Migrations
-```bash
-# Create new migration
-alembic revision --autogenerate -m "description"
-
-# Apply migrations
-alembic upgrade head
-
-# Rollback
-alembic downgrade -1
-```
-
-### Project Structure
-```
-app/
-├── main.py              # FastAPI app
-├── api/v1/              # API routes
-├── services/            # Business logic
-├── db/                  # Database models, session
-├── core/                # Config, security, Admin client
-├── schemas/             # Pydantic models
-└── templates/           # Jinja2 HTML templates
-```
-
-## Deployment
-
-### Docker
-```bash
-docker-compose up -d
-```
-
-### Production Settings
-- Use environment-specific config
-- Enable HTTPS
-- Set strong JWT secret
-- Use gunicorn + uvicorn workers
-- Enable rate limiting
-- Configure CORS for frontend domains
-
-## API Examples
-
-### Register
-```bash
-curl -X POST http://localhost:8000/api/v1/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "trader@example.com",
-    "password": "secure_password_123",
-    "business_name": "My Shop"
-  }'
-```
-
-### Login
-```bash
-curl -X POST http://localhost:8000/api/v1/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "trader@example.com",
-    "password": "secure_password_123"
-  }'
-```
-
-### Sync Products
-```bash
-curl -X POST http://localhost:8000/api/v1/sync/products \
-  -H "Authorization: Bearer <access_token>"
-```
-
-### List Products
-```bash
-curl -X GET http://localhost:8000/api/v1/trader/products \
-  -H "Authorization: Bearer <access_token>"
-```
-
-### Update Product
-```bash
-curl -X PATCH http://localhost:8000/api/v1/trader/products/1 \
-  -H "Authorization: Bearer <access_token>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "local_description": "Amazing product",
-    "visibility": true
-  }'
-```
-
-## Troubleshooting
-
-### Database Connection Error
-- Check PostgreSQL is running
-- Verify DATABASE_URL in .env
-- Run migrations: `alembic upgrade head`
-
-### JWT Token Expired
-- Use refresh token endpoint to get new access token
-- Refresh tokens valid for 7 days
-
-### Product Sync Failed
-- Check ADMIN_API_BASE_URL is correct
-- Verify trader status is ACTIVE
-- Check Admin API is running and accessible
-
-## Support
-
-For issues or questions, check the project documentation or create an issue.
+| Endpoint | Description |
+|----------|-------------|
+| POST /api/v1/auth/register-trader | Register trader (returns user.id) |
+| POST /api/v1/auth/login/otp | Verify OTP |
+| POST /api/v1/auth/login | Login (after approval) |
+| GET /api/v1/admin/sync/products | Sync products (requires auth) |
+| GET /api/v1/admin/sync/orders | Sync orders (requires auth) |

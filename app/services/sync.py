@@ -1,13 +1,30 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from datetime import datetime
+from typing import Tuple, Optional
+import logging
 
 from app.db.models import Trader, Category, Product, TraderProduct, Order, OrderItem, AuditLog, OrderStatus
 from app.core.admin_client import admin_client
 
+logger = logging.getLogger(__name__)
 
-async def sync_products_from_admin(db: AsyncSession, trader: Trader, access_token: str) -> dict:
-    response = await admin_client.sync_products(access_token=access_token, api_key=trader.api_key or "")
+
+async def sync_products_from_admin(
+    db: AsyncSession,
+    trader: Trader,
+    access_token: str,
+    refresh_token: str = ""
+) -> Tuple[dict, Optional[str], Optional[str]]:
+    """
+    Sync products with auto token refresh.
+    Returns: (result_dict, new_access_token, new_refresh_token)
+    """
+    response, new_access, new_refresh = await admin_client.sync_products_with_refresh(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        api_key=trader.api_key or ""
+    )
 
     new_count = 0
     updated_count = 0
@@ -80,16 +97,26 @@ async def sync_products_from_admin(db: AsyncSession, trader: Trader, access_toke
         "synced": new_count + updated_count,
         "new": new_count,
         "updated": updated_count
-    }
+    }, new_access, new_refresh
 
 
-async def sync_orders_from_admin(db: AsyncSession, trader: Trader, access_token: str) -> dict:
+async def sync_orders_from_admin(
+    db: AsyncSession,
+    trader: Trader,
+    access_token: str,
+    refresh_token: str = ""
+) -> Tuple[dict, Optional[str], Optional[str]]:
+    """
+    Sync orders with auto token refresh.
+    Returns: (result_dict, new_access_token, new_refresh_token)
+    """
     if not trader.backend_user_id:
         raise ValueError("Trader not linked to backend user. Please re-register.")
 
-    response = await admin_client.sync_orders(
+    response, new_access, new_refresh = await admin_client.sync_orders_with_refresh(
         backend_user_id=trader.backend_user_id,
         access_token=access_token,
+        refresh_token=refresh_token,
         api_key=trader.api_key or ""
     )
 
@@ -140,6 +167,13 @@ async def sync_orders_from_admin(db: AsyncSession, trader: Trader, access_token:
                         price_snapshot=order_item["priceAtPurchase"]
                     )
                     db.add(order_item_obj)
+                else:
+                    # Log warning but don't fail - product might not be synced yet
+                    import logging
+                    logging.getLogger(__name__).warning(
+                        f"Order {order.source_id} item skipped: product source_id={order_item['productId']} not found. "
+                        f"Sync products first."
+                    )
 
             new_count += 1
 
@@ -156,4 +190,4 @@ async def sync_orders_from_admin(db: AsyncSession, trader: Trader, access_token:
         "synced": new_count + updated_count,
         "new": new_count,
         "updated": updated_count
-    }
+    }, new_access, new_refresh

@@ -16,10 +16,12 @@ class OrderStatus(str, enum.Enum):
     PENDING = "PENDING"
     CONFIRMED = "CONFIRMED"
     ASSIGNED = "ASSIGNED"
+    ACCEPTED = "ACCEPTED"
     PICKED_UP = "PICKED_UP"
     IN_TRANSIT = "IN_TRANSIT"
     DELIVERED = "DELIVERED"
     FAILED = "FAILED"
+    CANCELLED = "CANCELLED"
 
 
 class Trader(Base):

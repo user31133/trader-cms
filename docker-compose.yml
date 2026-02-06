@@ -1,14 +1,23 @@
+# =============================================================================
+# SHOP TEMPLATE - Docker Compose Configuration
+# =============================================================================
+# Before running:
+# 1. Copy .env.example to .env
+# 2. Configure SHOP_NAME, TRADER_ID, and other settings
+# 3. Start main backend first: cd ../online_shop-backend && docker compose up -d
+# 4. Run: docker compose up --build
+
 services:
-  # PostgreSQL Database
+  # PostgreSQL Database (local for shop data)
   postgres:
     image: postgres:15-alpine
-    container_name: brokercms-db
+    container_name: ${SHOP_NAME:-shop}-db
     environment:
-      POSTGRES_DB: brokercms
+      POSTGRES_DB: shop_data
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     ports:
-      - "5432:5432"
+      - "${DB_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -17,41 +26,43 @@ services:
       timeout: 5s
       retries: 5
 
-  # Trader CMS (Admin Panel)
-  trader-cms:
+  # CMS (Admin Panel for Traders)
+  cms:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: brokercms-trader-cms
+    container_name: ${SHOP_NAME:-shop}-cms
     environment:
-      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/brokercms
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/shop_data
       ADMIN_API_BASE_URL: ${ADMIN_API_BASE_URL:-http://shopbackend:8080}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-change-this-secret-key-in-production}
       SESSION_SECRET_KEY: ${SESSION_SECRET_KEY:-change-this-session-secret-in-production}
+      SHOP_NAME: ${SHOP_NAME:-My Shop}
+      TRADER_ID: ${TRADER_ID:-1}
       JWT_ALGORITHM: HS256
       ACCESS_TOKEN_EXPIRE_MINUTES: 30
       REFRESH_TOKEN_EXPIRE_DAYS: 7
     ports:
-      - "8000:8000"
+      - "${CMS_PORT:-8000}:8000"
     depends_on:
       postgres:
         condition: service_healthy
     volumes:
       - .:/app
-      - trader_static:/app/static/uploads
+      - static_uploads:/app/static/uploads
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     networks:
       - default
       - backend
 
-  # Customer Shop (Storefront)
+  # Shop (Customer Storefront)
   shop:
     build:
       context: ./shop
       dockerfile: Dockerfile
-    container_name: brokercms-shop
+    container_name: ${SHOP_NAME:-shop}-storefront
     environment:
-      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/brokercms
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/shop_data
       ADMIN_API_BASE_URL: ${ADMIN_API_BASE_URL:-http://shopbackend:8080}
       JWT_SECRET_KEY: ${SHOP_JWT_SECRET_KEY:-change-this-shop-secret-key}
       JWT_ALGORITHM: HS256
@@ -61,22 +72,22 @@ services:
       TRADER_ID: ${TRADER_ID:-1}
       SHOP_NAME: ${SHOP_NAME:-My Shop}
     ports:
-      - "8001:8001"
+      - "${SHOP_PORT:-8001}:8001"
     depends_on:
       postgres:
         condition: service_healthy
-      trader-cms:
+      cms:
         condition: service_started
     volumes:
       - ./shop:/app
-      - ./app:/trader-cms/app:ro  # Mount trader-cms app directory as read-only
+      - ./app:/trader-cms/app:ro
     networks:
       - default
       - backend
 
 volumes:
   postgres_data:
-  trader_static:
+  static_uploads:
 
 networks:
   default:
