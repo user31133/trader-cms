@@ -1,0 +1,80 @@
+# =============================================================================
+# E2E TEST STACK
+# Usage: docker compose -f docker-compose.test.yml up --build --abort-on-container-exit
+# =============================================================================
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: test-db
+    environment:
+      POSTGRES_DB: shop_data
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  mock-tradeops:
+    build:
+      context: ./tests/mock_tradeops
+      dockerfile: Dockerfile
+    container_name: test-mock-tradeops
+    ports:
+      - "8090:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8080/health')\""]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  cms:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: test-cms
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/shop_data
+      ADMIN_API_BASE_URL: http://mock-tradeops:8080
+      JWT_SECRET_KEY: test-jwt-secret-key-for-e2e-tests
+      JWT_ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: 60
+      REFRESH_TOKEN_EXPIRE_DAYS: 7
+      SESSION_SECRET_KEY: test-session-secret-for-e2e-tests
+      SHOP_NAME: TestShop
+      TRADER_ID: 1
+    command: sh tests/entrypoint.test.sh
+    ports:
+      - "3000:8000"
+    volumes:
+      - .:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mock-tradeops:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\""]
+      interval: 5s
+      timeout: 10s
+      retries: 15
+      start_period: 20s
+
+  playwright:
+    image: mcr.microsoft.com/playwright/python:v1.44.0-jammy
+    container_name: test-playwright
+    working_dir: /tests
+    volumes:
+      - ./tests/e2e:/tests
+    environment:
+      CMS_URL: http://cms:8000
+    command: >
+      sh -c "
+        pip install -r requirements.txt -q &&
+        pytest test_categories.py -v --tb=short
+      "
+    depends_on:
+      cms:
+        condition: service_healthy

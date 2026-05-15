@@ -1,0 +1,197 @@
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+from datetime import datetime
+from typing import Tuple, Optional
+import logging
+
+from app.db.models import Trader, Category, Product, TraderProduct, Order, OrderItem, AuditLog, OrderStatus
+from app.core.admin_client import admin_client
+
+logger = logging.getLogger(__name__)
+
+
+async def sync_products_from_admin(
+    db: AsyncSession,
+    trader: Trader,
+    access_token: str,
+    refresh_token: str = ""
+) -> Tuple[dict, Optional[str], Optional[str]]:
+    """
+    Sync products with auto token refresh.
+    Returns: (result_dict, new_access_token, new_refresh_token)
+    """
+    response, new_access, new_refresh = await admin_client.sync_products_with_refresh(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        api_key=trader.api_key or ""
+    )
+
+    new_count = 0
+    updated_count = 0
+
+    for item in response["products"]:
+        # Use the backend category ID as source_id; fall back to product source_id for legacy data
+        cat_source_id = item.get("categoryId") or item["sourceId"]
+        category_result = await db.execute(select(Category).where(Category.source_id == cat_source_id))
+        category = category_result.scalar_one_or_none()
+
+        category_name = item["category"]
+        if not category:
+            category = Category(
+                source_id=cat_source_id,
+                name=category_name,
+                version="v1",
+                synced_at=datetime.utcnow()
+            )
+            db.add(category)
+            await db.flush()
+        elif category.name != category_name and category_name != str(cat_source_id):
+            # Update stale category name (e.g. "1" → "Electronics")
+            category.name = category_name
+            await db.flush()
+
+        product_result = await db.execute(select(Product).where(Product.source_id == item["sourceId"]))
+        product = product_result.scalar_one_or_none()
+
+        if product:
+            if product.version != item["version"]:
+                product.price = item["price"]
+                product.central_stock = item["centralStock"]
+                product.version = item["version"]
+                product.synced_at = datetime.utcnow()
+                updated_count += 1
+        else:
+            product = Product(
+                source_id=item["sourceId"],
+                title=item["title"],
+                price=item["price"],
+                central_stock=item["centralStock"],
+                category_id=category.id,
+                version=item["version"],
+                synced_at=datetime.utcnow()
+            )
+            db.add(product)
+            await db.flush()
+            new_count += 1
+
+        tp_result = await db.execute(
+            select(TraderProduct).where(
+                TraderProduct.trader_id == trader.id,
+                TraderProduct.product_id == product.id
+            )
+        )
+        trader_product = tp_result.scalar_one_or_none()
+
+        if not trader_product:
+            trader_product = TraderProduct(
+                trader_id=trader.id,
+                product_id=product.id,
+                local_images=[],
+                visibility=True
+            )
+            db.add(trader_product)
+
+    audit_log = AuditLog(
+        trader_id=trader.id,
+        action="SYNC",
+        entity="product",
+        audit_data={"new": new_count, "updated": updated_count}
+    )
+    db.add(audit_log)
+    await db.commit()
+
+    return {
+        "synced": new_count + updated_count,
+        "new": new_count,
+        "updated": updated_count
+    }, new_access, new_refresh
+
+
+async def sync_orders_from_admin(
+    db: AsyncSession,
+    trader: Trader,
+    access_token: str,
+    refresh_token: str = ""
+) -> Tuple[dict, Optional[str], Optional[str]]:
+    """
+    Sync orders with auto token refresh.
+    Returns: (result_dict, new_access_token, new_refresh_token)
+    """
+    response, new_access, new_refresh = await admin_client.sync_orders_with_refresh(
+        backend_user_id=0,
+        access_token=access_token,
+        refresh_token=refresh_token,
+        api_key=trader.api_key or ""
+    )
+
+    new_count = 0
+    updated_count = 0
+
+    for item in response["orders"]:
+        order_result = await db.execute(select(Order).where(Order.source_id == item["sourceId"]))
+        order = order_result.scalar_one_or_none()
+
+        # Parse the createdAt timestamp
+        created_at = datetime.fromisoformat(item["createdAt"].replace("Z", "+00:00"))
+
+        if order:
+            # Update existing order if version changed
+            if order.version != item.get("version", ""):
+                order.total = item["totalPrice"]
+                order.status = OrderStatus[item["status"]]
+                order.version = item.get("version", "")
+                order.synced_at = datetime.utcnow()
+                updated_count += 1
+        else:
+            # Create new order
+            order = Order(
+                source_id=item["sourceId"],
+                trader_id=trader.id,
+                total=item["totalPrice"],
+                status=OrderStatus[item["status"]],
+                created_at=created_at,
+                synced_at=datetime.utcnow(),
+                version=item.get("version", "")
+            )
+            db.add(order)
+            await db.flush()
+
+            # Add order items
+            for order_item in item["items"]:
+                product_result = await db.execute(
+                    select(Product).where(Product.source_id == order_item["productId"])
+                )
+                product = product_result.scalar_one_or_none()
+
+                if product:
+                    order_item_obj = OrderItem(
+                        order_id=order.id,
+                        product_id=product.id,
+                        quantity=order_item["quantity"],
+                        price_snapshot=order_item["priceAtPurchase"]
+                    )
+                    db.add(order_item_obj)
+                else:
+                    # Log warning but don't fail - product might not be synced yet
+                    import logging
+                    logging.getLogger(__name__).warning(
+                        f"Order {order.source_id} item skipped: product source_id={order_item['productId']} not found. "
+                        f"Sync products first."
+                    )
+
+            new_count += 1
+
+    audit_log = AuditLog(
+        trader_id=trader.id,
+        action="SYNC_ORDERS",
+        entity="order",
+        audit_data={"new": new_count, "updated": updated_count}
+    )
+    db.add(audit_log)
+    await db.commit()
+
+    return {
+        "synced": new_count + updated_count,
+        "new": new_count,
+        "updated": updated_count
+    }, new_access, new_refresh

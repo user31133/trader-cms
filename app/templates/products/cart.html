@@ -1,0 +1,243 @@
+{% extends "base.html" %}
+
+{% block title %}Cart - Trader CMS{% endblock %}
+{% block page_title %}Selection Cart{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4 align-items-center">
+        <div class="col-md-6">
+            <h4>Your Selection Cart</h4>
+            <p class="text-muted small mb-0">Review and save your selected products</p>
+        </div>
+        <div class="col-md-6 text-end">
+            <a href="/products/browse" class="btn btn-primary me-2">
+                <i class="bi bi-search"></i> Continue Browsing
+            </a>
+            <button class="btn btn-danger" id="clear-cart-btn">
+                <i class="bi bi-trash"></i> Clear Cart
+            </button>
+        </div>
+    </div>
+
+    <!-- Cart Items -->
+    <div class="card border-0 shadow-sm">
+        <div class="card-body" id="cart-content">
+            <div class="text-center py-5">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cart Actions -->
+    <div class="row mt-4" id="cart-actions" style="display: none;">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col-md-6">
+                            <h5 class="mb-0">Total Items: <span id="total-items">0</span></h5>
+                        </div>
+                        <div class="col-md-6 text-end">
+                            <button class="btn btn-success btn-lg" id="save-cart-btn">
+                                <i class="bi bi-check-circle"></i> Save Selected Products
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Load cart on page load
+document.addEventListener('DOMContentLoaded', function() {
+    loadCart();
+});
+
+async function loadCart() {
+    try {
+        const res = await fetch('/api/v1/browse/cart');
+        const data = await res.json();
+
+        const cartContent = document.getElementById('cart-content');
+        const cartActions = document.getElementById('cart-actions');
+        const totalItems = document.getElementById('total-items');
+
+        if (data.count === 0) {
+            cartContent.innerHTML = `
+                <div class="text-center py-5">
+                    <i class="bi bi-cart-x text-muted" style="font-size: 4rem;"></i>
+                    <h4 class="mt-3">Your cart is empty</h4>
+                    <p class="text-muted">Browse products to add items to your cart.</p>
+                    <a href="/products/browse" class="btn btn-primary mt-3">
+                        <i class="bi bi-search"></i> Browse Products
+                    </a>
+                </div>
+            `;
+            cartActions.style.display = 'none';
+        } else {
+            // Fetch browse cache to display product details
+            const browseCache = await getBrowseCache();
+
+            if (!browseCache || browseCache.length === 0) {
+                cartContent.innerHTML = `
+                    <div class="alert alert-warning">
+                        <i class="bi bi-exclamation-triangle"></i> Cart data unavailable. Please browse products again.
+                    </div>
+                `;
+                cartActions.style.display = 'none';
+                return;
+            }
+
+            // Filter products that are in cart
+            const cartProducts = browseCache.filter(p => data.cart.includes(p.sourceId));
+
+            let html = '<div class="table-responsive"><table class="table table-hover">';
+            html += '<thead class="table-light"><tr>';
+            html += '<th>Product</th><th>Category</th><th>Price</th><th>Stock</th><th>Actions</th>';
+            html += '</tr></thead><tbody>';
+
+            cartProducts.forEach(product => {
+                html += `
+                    <tr data-source-id="${product.sourceId}">
+                        <td>
+                            <strong>${product.title}</strong>
+                        </td>
+                        <td>
+                            <span class="badge bg-light text-dark">${product.category.name}</span>
+                        </td>
+                        <td>$${product.price}</td>
+                        <td>
+                            <small class="text-muted">${product.centralStock} units</small>
+                        </td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-danger remove-from-cart" data-source-id="${product.sourceId}">
+                                <i class="bi bi-trash"></i> Remove
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            html += '</tbody></table></div>';
+            cartContent.innerHTML = html;
+            totalItems.textContent = data.count;
+            cartActions.style.display = 'block';
+
+            // Attach remove handlers
+            document.querySelectorAll('.remove-from-cart').forEach(btn => {
+                btn.addEventListener('click', async function() {
+                    const sourceId = parseInt(this.getAttribute('data-source-id'));
+                    await removeFromCart([sourceId]);
+                });
+            });
+        }
+
+        updateCartBadge();
+    } catch (e) {
+        console.error('Failed to load cart:', e);
+        document.getElementById('cart-content').innerHTML = `
+            <div class="alert alert-danger">
+                <i class="bi bi-exclamation-circle"></i> Failed to load cart. Please try again.
+            </div>
+        `;
+    }
+}
+
+async function getBrowseCache() {
+    // Try to get from session via a hidden endpoint or localStorage
+    // For now, we'll fetch fresh from browse endpoint
+    try {
+        const res = await fetch('/api/v1/browse/products?page=1&limit=1000');
+        const data = await res.json();
+        return data.products;
+    } catch (e) {
+        console.error('Failed to fetch browse cache:', e);
+        return [];
+    }
+}
+
+async function removeFromCart(sourceIds) {
+    try {
+        const res = await fetch('/api/v1/browse/cart/remove', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ productSourceIds: sourceIds })
+        });
+
+        if (res.ok) {
+            await loadCart();
+        } else {
+            alert('Failed to remove item from cart');
+        }
+    } catch (e) {
+        console.error('Error removing from cart:', e);
+        alert('Failed to remove item from cart');
+    }
+}
+
+async function updateCartBadge() {
+    try {
+        const res = await fetch('/api/v1/browse/cart');
+        const data = await res.json();
+        const badge = document.getElementById('sidebar-cart-badge');
+        if (badge) {
+            badge.textContent = data.count;
+        }
+    } catch (e) {
+        console.error('Failed to update cart badge:', e);
+    }
+}
+
+// Clear cart button
+document.getElementById('clear-cart-btn').addEventListener('click', async function() {
+    if (!confirm('Are you sure you want to clear your cart?')) {
+        return;
+    }
+
+    try {
+        const res = await fetch('/api/v1/browse/cart/clear', { method: 'POST' });
+        if (res.ok) {
+            await loadCart();
+        } else {
+            alert('Failed to clear cart');
+        }
+    } catch (e) {
+        console.error('Error clearing cart:', e);
+        alert('Failed to clear cart');
+    }
+});
+
+// Save cart button
+document.getElementById('save-cart-btn').addEventListener('click', async function() {
+    const btn = this;
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Saving...';
+
+    try {
+        const res = await fetch('/api/v1/browse/cart/save', { method: 'POST' });
+        const data = await res.json();
+
+        if (res.ok) {
+            alert(`Success! ${data.saved} products saved to your catalog.`);
+            window.location.href = '/products?success=Products saved successfully';
+        } else {
+            const error = await res.json();
+            alert(`Failed to save: ${error.detail || 'Unknown error'}`);
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+        }
+    } catch (e) {
+        console.error('Error saving cart:', e);
+        alert('Failed to save products. Please try again.');
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+    }
+});
+</script>
+{% endblock %}
